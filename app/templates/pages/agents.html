@@ -7,4 +7,171 @@
 <div id="agent-list" hx-get="/api/agents" hx-trigger="every 10s" hx-swap="innerHTML">
   {% include "partials/agent_list.html" %}
 </div>
+
+<!-- CRT Monitor -->
+<div class="mt-6">
+  <div id="crt-monitor" class="relative" style="max-width: 800px; margin: 0 auto;">
+    <!-- Monitor bezel -->
+    <div style="background: linear-gradient(145deg, #2a2a2a 0%, #1a1a1a 50%, #222 100%); border-radius: 18px; padding: 18px 20px 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);">
+      <!-- Top bar with indicator LED and agent name -->
+      <div class="flex items-center gap-3 mb-3 px-2">
+        <div id="monitor-led" class="w-2.5 h-2.5 rounded-full bg-text-muted" style="box-shadow: 0 0 4px rgba(125,133,144,0.3);"></div>
+        <span id="monitor-label" class="text-[11px] font-mono text-text-muted tracking-wider uppercase">Standby</span>
+        <div class="flex-1"></div>
+        <span id="monitor-badge" class="text-[9px] font-mono text-text-muted">SEACLIP TERMINAL v1</span>
+      </div>
+
+      <!-- Screen -->
+      <div style="background: #0a0c10; border-radius: 8px; border: 2px solid #111; position: relative; overflow: hidden;">
+        <!-- Scanline overlay -->
+        <div style="position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px); pointer-events: none; z-index: 1;"></div>
+        <!-- Screen glow -->
+        <div id="screen-glow" style="position: absolute; inset: 0; border-radius: 8px; pointer-events: none; z-index: 0; transition: box-shadow 0.5s;"></div>
+
+        <!-- Terminal content -->
+        <div id="crt-terminal" class="font-mono text-[11px] leading-5 p-4 overflow-y-auto relative" style="height: 260px; z-index: 2; color: #33ff33;">
+          <div style="color: #555;">
+            <pre style="color: #33ff33; margin: 0;">  ___  ___  ___   ___ _    ___ ___
+ / __|/ _ \/ __| / __| |  |_ _| _ \
+ \__ \  __/ (__ | (__| |__ | ||  _/
+ |___/\___|\___| \___|____|___|_|  </pre>
+            <br>
+            <span style="color: #33ff33;">$</span> system ready — waiting for agent activation...
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom bezel with brand -->
+      <div class="flex items-center justify-between mt-3 px-2">
+        <span class="text-[9px] font-mono" style="color: #444;">HUB://MAC-STUDIO</span>
+        <div class="flex gap-2">
+          <span id="monitor-mode" class="text-[9px] font-mono" style="color: #444;">MODE: IDLE</span>
+          <span id="monitor-time" class="text-[9px] font-mono" style="color: #444;"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var terminal = document.getElementById('crt-terminal');
+var led = document.getElementById('monitor-led');
+var label = document.getElementById('monitor-label');
+var screenGlow = document.getElementById('screen-glow');
+var monitorMode = document.getElementById('monitor-mode');
+var activeAgent = null;
+var lineCount = 0;
+
+var agentColors = {
+  'Curious Charlie': '#33aaff',
+  'Peter Plan': '#bb77ff',
+  'David Dev': '#ffcc33',
+  'Test Tina': '#33ff77',
+  'Sceptic Suzy': '#ff8833',
+  'Merge Matthews': '#33ffee',
+};
+
+function ts() {
+  return new Date().toLocaleTimeString();
+}
+
+// Update clock
+setInterval(function() {
+  document.getElementById('monitor-time').textContent = new Date().toLocaleTimeString();
+}, 1000);
+
+function addLine(text, color) {
+  var line = document.createElement('div');
+  line.style.color = color || '#33ff33';
+  line.innerHTML = '<span style="color:#555;">' + ts() + '</span> ' + text;
+  terminal.appendChild(line);
+  lineCount++;
+  if (lineCount > 300) { terminal.children[0].remove(); lineCount--; }
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+function activateMonitor(agent) {
+  activeAgent = agent;
+  var color = agentColors[agent] || '#33ff33';
+
+  // Clear screen
+  terminal.innerHTML = '';
+  lineCount = 0;
+
+  // Boot sequence
+  addLine('<span style="color:' + color + ';font-weight:bold;">▶ ' + agent + '</span> initialized', color);
+  addLine('Connecting to AI backend...', '#555');
+
+  // LED + label
+  led.style.background = color;
+  led.style.boxShadow = '0 0 8px ' + color;
+  label.textContent = agent;
+  label.style.color = color;
+  monitorMode.textContent = 'MODE: ACTIVE';
+  monitorMode.style.color = color;
+
+  // Screen glow
+  screenGlow.style.boxShadow = 'inset 0 0 60px ' + color + '15, inset 0 0 20px ' + color + '10';
+}
+
+function deactivateMonitor(agent, status) {
+  var color = status === 'completed' ? '#33ff33' : '#ff3333';
+  var icon = status === 'completed' ? '✓' : '✗';
+  addLine('<span style="color:' + color + ';font-weight:bold;">' + icon + ' ' + agent + ' ' + status + '</span>', color);
+
+  led.style.background = status === 'completed' ? '#33ff33' : '#ff3333';
+  led.style.boxShadow = '0 0 6px ' + (status === 'completed' ? '#33ff33' : '#ff3333');
+  monitorMode.textContent = 'MODE: ' + status.toUpperCase();
+  monitorMode.style.color = '#444';
+
+  // Dim glow after 3s
+  setTimeout(function() {
+    if (!activeAgent) {
+      screenGlow.style.boxShadow = 'none';
+      led.style.background = '#7d8590';
+      led.style.boxShadow = '0 0 4px rgba(125,133,144,0.3)';
+      label.style.color = '#7d8590';
+      monitorMode.textContent = 'MODE: IDLE';
+    }
+  }, 3000);
+
+  activeAgent = null;
+}
+
+// Single SSE connection
+var es;
+function connect() {
+  es = new EventSource('/api/agents/stream');
+
+  es.addEventListener('log', function(e) {
+    var data = JSON.parse(e.data);
+    var agent = data.agent || '';
+    var color = agentColors[agent] || '#33ff33';
+    if (!activeAgent && agent) activateMonitor(agent);
+    if (activeAgent === agent) {
+      addLine(data.message, color);
+    }
+  });
+
+  es.addEventListener('status', function(e) {
+    var data = JSON.parse(e.data);
+    var agent = data.agent || '';
+    if (data.status === 'active') {
+      activateMonitor(agent);
+      addLine(data.message, agentColors[agent] || '#33ff33');
+    } else {
+      if (activeAgent === agent) {
+        deactivateMonitor(agent, data.status);
+      }
+    }
+  });
+
+  es.onerror = function() {
+    es.close();
+    addLine('Connection lost — reconnecting...', '#ff3333');
+    setTimeout(connect, 5000);
+  };
+}
+connect();
+</script>
 {% endblock %}

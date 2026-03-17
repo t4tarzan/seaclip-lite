@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..database import get_db
-from ..models import Issue, Agent, ImportedComment
+from ..models import Issue, Agent, ImportedComment, ActivityLog
 
 router = APIRouter()
 
@@ -20,11 +20,16 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
 
     agents = (await db.execute(select(Agent).order_by(Agent.created_at))).scalars().all()
 
+    activities = (await db.execute(
+        select(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(50)
+    )).scalars().all()
+
     return request.app.state.templates.TemplateResponse("pages/dashboard.html", {
         "request": request,
         "counts": counts,
         "agents": agents,
         "total": sum(counts.values()),
+        "activities": activities,
     })
 
 

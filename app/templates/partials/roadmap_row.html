@@ -1,0 +1,50 @@
+{% set cat_colors = {
+  'core': 'border-l-blue-400',
+  'ui': 'border-l-purple-400',
+  'ai': 'border-l-cyan-400',
+  'infra': 'border-l-orange-400',
+  'governance': 'border-l-yellow-400',
+  'integration': 'border-l-green-400'
+} %}
+{% set status_styles = {
+  'planned': 'bg-bg-alt text-text-muted',
+  'in_progress': 'bg-primary/20 text-primary',
+  'done': 'bg-success/20 text-success',
+  'deferred': 'bg-error/20 text-error'
+} %}
+<div class="task-row bg-surface border border-border {{ cat_colors.get(task.category, 'border-l-text-muted') }} border-l-[3px] p-4 flex items-start gap-4 {{ 'opacity-60' if task.status == 'done' else '' }}"
+     data-category="{{ task.category }}" data-status="{{ task.status }}">
+  <div class="w-8 h-8 flex items-center justify-center bg-bg-alt text-[12px] font-bold text-text-muted shrink-0">
+    {{ task.priority }}
+  </div>
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-[13px] font-semibold text-text-primary">{{ task.feature }}</span>
+      <span class="badge {{ status_styles.get(task.status, 'bg-bg-alt text-text-muted') }}">{{ task.status }}</span>
+      {% if issue %}
+      <a href="/issues/{{ issue.id }}" class="text-[10px] text-primary hover:underline">kanban →</a>
+      {% endif %}
+    </div>
+    <p class="text-[11px] text-text-secondary leading-relaxed mb-2">{{ task.description[:200] }}{% if task.description|length > 200 %}...{% endif %}</p>
+    <div class="flex gap-3 text-[10px]">
+      <span class="text-text-muted">{{ task.category }}</span>
+      <span class="{{ 'text-success' if task.impact == 'high' else 'text-warning' if task.impact == 'medium' else 'text-text-muted' }}">{{ task.impact }} impact</span>
+      <span class="{{ 'text-success' if task.effort == 'easy' else 'text-warning' if task.effort == 'medium' else 'text-error' }}">{{ task.effort }} effort</span>
+      {% if task.completed_at %}
+      <span class="text-success">completed {{ task.completed_at.strftime('%b %d, %Y') }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <form hx-post="/api/roadmap/{{ task.id }}/status" hx-target="closest .task-row" hx-swap="outerHTML" class="shrink-0">
+    {% if task.status == 'planned' %}
+    <input type="hidden" name="status" value="in_progress">
+    <button type="submit" class="text-[10px] text-primary border border-primary/30 px-2 py-1 hover:bg-primary/10">Start</button>
+    {% elif task.status == 'in_progress' %}
+    <input type="hidden" name="status" value="done">
+    <button type="submit" class="text-[10px] text-success border border-success/30 px-2 py-1 hover:bg-success/10">Done</button>
+    {% elif task.status == 'done' %}
+    <input type="hidden" name="status" value="planned">
+    <button type="submit" class="text-[10px] text-text-muted border border-border px-2 py-1 hover:bg-bg-alt">Reopen</button>
+    {% endif %}
+  </form>
+</div>
