@@ -1,0 +1,43 @@
+{% if flash %}
+<div class="text-[11px] text-success mb-2">{{ flash }}</div>
+{% endif %}
+{% if backups %}
+<div class="space-y-2">
+  {% for b in backups %}
+  <div class="flex items-center gap-3 bg-bg border border-border px-3 py-2 text-[12px] flex-wrap">
+    <!-- Type badge -->
+    {% if b.backup_type == "sqlite" %}
+    <span class="text-[10px] font-semibold px-1.5 py-0.5 bg-primary/10 text-primary">SQLite</span>
+    {% else %}
+    <span class="text-[10px] font-semibold px-1.5 py-0.5 bg-success/10 text-success">JSON</span>
+    {% endif %}
+    <!-- Filename -->
+    <span class="font-mono text-text-secondary text-[11px] truncate max-w-xs">{{ b.file_path | replace("./backups/", "") | replace("backups/", "") }}</span>
+    <!-- Size -->
+    <span class="text-[10px] text-text-muted bg-bg-alt px-1.5 py-0.5">{{ human_size(b.file_size) }}</span>
+    <!-- Description -->
+    {% if b.description and b.description != "auto" %}
+    <span class="text-[11px] text-text-secondary italic">{{ b.description }}</span>
+    {% elif b.description == "auto" %}
+    <span class="text-[10px] text-text-muted bg-bg-alt px-1.5 py-0.5">auto</span>
+    {% endif %}
+    <!-- Status -->
+    {% if b.status == "ok" %}
+    <span class="text-[10px] text-success">✓</span>
+    {% else %}
+    <span class="text-[10px] text-error">✗ error</span>
+    {% endif %}
+    <!-- Timestamp -->
+    <span class="text-[10px] text-text-muted ml-auto">{{ b.created_at.strftime('%Y-%m-%d %H:%M') if b.created_at else '' }}</span>
+    <!-- Download -->
+    <a href="/api/backup/{{ b.id }}/download" class="text-[10px] text-primary hover:underline shrink-0">Download</a>
+    <!-- Delete -->
+    <form hx-post="/api/backup/{{ b.id }}/delete" hx-target="#backup-list" hx-swap="innerHTML" class="shrink-0">
+      <button type="submit" class="text-[10px] text-error hover:underline">Delete</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="text-[11px] text-text-muted py-2">No backups yet. Click "Create Backup" to get started.</p>
+{% endif %}

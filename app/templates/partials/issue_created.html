@@ -1,0 +1,23 @@
+<div class="flex justify-start">
+  <div class="max-w-[85%] bg-surface border border-success/40 p-4 text-[13px] text-text-primary">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="w-2 h-2 rounded-full bg-success"></span>
+      <span class="text-success font-semibold text-[12px]">Issue Created</span>
+    </div>
+    <div class="font-semibold mb-1">{{ issue.title }}</div>
+    <div class="text-[11px] text-text-muted mb-3">
+      Priority: <span class="text-text-secondary">{{ issue.priority }}</span>
+      {% if issue.github_repo %}
+       | Repo: <span class="text-text-secondary">{{ issue.github_repo }}</span>
+      {% endif %}
+    </div>
+    <div class="flex gap-2">
+      <a href="/issues/{{ issue.id }}" class="bg-primary text-white px-3 py-1.5 text-[12px] hover:bg-primary-hover inline-block">
+        Open Issue
+      </a>
+      <a href="/kanban" class="bg-surface border border-border text-text-secondary px-3 py-1.5 text-[12px] hover:text-primary hover:border-primary inline-block">
+        View Kanban
+      </a>
+    </div>
+  </div>
+</div>

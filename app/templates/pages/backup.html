@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% set active = "backup" %}
+{% block title %}Backup & Restore — SeaClip Lite{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-lg font-semibold">Backup &amp; Restore</h1>
+  <div class="flex gap-3 text-[11px]">
+    <span class="text-text-muted">{{ backups | length }} backup{{ 's' if backups | length != 1 else '' }}</span>
+    {% if last_backup %}
+    <span class="text-text-secondary">Last: {{ last_backup.created_at.strftime('%Y-%m-%d %H:%M') if last_backup.created_at else 'unknown' }}</span>
+    {% endif %}
+    <span class="text-text-muted font-mono">{{ backup_dir }}</span>
+  </div>
+</div>
+
+<!-- Create Backup panel -->
+<div class="bg-bg-alt border border-border p-4 mb-4">
+  <h2 class="text-[13px] font-semibold text-text-primary mb-3">Create Backup</h2>
+  <form hx-post="/api/backup/create" hx-target="#backup-list" hx-swap="innerHTML"
+        class="flex flex-wrap items-end gap-4">
+    <!-- Format selector -->
+    <div class="flex flex-col gap-2">
+      <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider">Format</label>
+      <div class="flex gap-4">
+        <label class="flex items-center gap-2 text-[12px] text-text-secondary cursor-pointer">
+          <input type="radio" name="format" value="sqlite" checked class="accent-primary"> SQLite file copy
+        </label>
+        <label class="flex items-center gap-2 text-[12px] text-text-secondary cursor-pointer">
+          <input type="radio" name="format" value="json" class="accent-primary"> JSON export
+        </label>
+      </div>
+    </div>
+    <!-- Description -->
+    <div class="flex flex-col gap-1 flex-1 min-w-[200px]">
+      <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider">Description <span class="font-normal normal-case">(optional)</span></label>
+      <input type="text" name="description" placeholder="e.g. pre-deploy snapshot"
+             class="bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary placeholder-text-muted">
+    </div>
+    <!-- Submit -->
+    <button type="submit"
+            class="bg-primary hover:bg-primary-hover text-white text-[12px] font-semibold px-4 py-1.5 transition-colors shrink-0">
+      Create Backup
+    </button>
+  </form>
+</div>
+
+<!-- Two-column panel: Import + Export -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+  <!-- Import JSON panel -->
+  <div class="bg-bg-alt border border-border p-4">
+    <h2 class="text-[13px] font-semibold text-text-primary mb-1">Import JSON Backup</h2>
+    <p class="text-[11px] text-warning mb-3">Import merges records. Existing IDs are overwritten.</p>
+    <form hx-post="/api/backup/import" hx-target="#backup-list" hx-swap="innerHTML"
+          hx-encoding="multipart/form-data" class="flex flex-col gap-2">
+      <input type="file" name="file" accept=".json"
+             class="text-[11px] text-text-secondary bg-bg border border-border px-2 py-1 cursor-pointer file:mr-3 file:bg-bg-alt file:border file:border-border file:text-text-secondary file:text-[11px] file:px-2 file:py-0.5 file:cursor-pointer">
+      <button type="submit"
+              class="bg-bg border border-border text-text-secondary hover:text-text-primary hover:border-border-hover text-[12px] px-3 py-1.5 transition-colors text-left">
+        Import &amp; Merge
+      </button>
+    </form>
+  </div>
+
+  <!-- Export Issues panel -->
+  <div class="bg-bg-alt border border-border p-4">
+    <h2 class="text-[13px] font-semibold text-text-primary mb-1">Export Issues</h2>
+    <p class="text-[11px] text-text-muted mb-3">Download all issues as a JSON file.</p>
+    <a href="/api/backup/export/issues"
+       class="inline-block bg-bg border border-border text-text-secondary hover:text-text-primary hover:border-border-hover text-[12px] px-3 py-1.5 transition-colors">
+      Export Issues as JSON ↓
+    </a>
+  </div>
+</div>
+
+<!-- SQLite restore note -->
+<div class="bg-bg-alt border border-border border-l-4 border-l-warning p-3 mb-4">
+  <p class="text-[11px] text-warning font-semibold mb-1">SQLite File Restore</p>
+  <p class="text-[11px] text-text-muted">
+    To restore a full database from a <code class="text-primary">.sqlite</code> backup:
+    download the file, stop the app, replace <code class="text-primary">seaclip.db</code>, then restart.
+    Do not replace the database while the app is running.
+  </p>
+</div>
+
+<!-- Backup list -->
+<div class="bg-bg-alt border border-border p-4">
+  <h2 class="text-[13px] font-semibold text-text-primary mb-3">Backup History</h2>
+  <div id="backup-list" hx-get="/api/backup" hx-trigger="load">
+    <p class="text-[11px] text-text-muted">Loading...</p>
+  </div>
+</div>
+{% endblock %}

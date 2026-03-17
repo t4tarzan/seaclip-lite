@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% set active = "roadmap" %}
+{% block title %}Roadmap — SeaClip Lite{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-lg font-semibold">Development Roadmap</h1>
+  <div class="flex gap-3 text-[11px]">
+    <span class="text-text-muted">{{ stats.total }} features</span>
+    <span class="text-success">{{ stats.done }} done</span>
+    <span class="text-primary">{{ stats.in_progress }} active</span>
+    <span class="text-text-secondary">{{ stats.planned }} planned</span>
+  </div>
+</div>
+
+<!-- Progress bar -->
+<div class="w-full h-2 bg-bg-alt mb-6 overflow-hidden">
+  {% set pct_done = (stats.done / stats.total * 100) if stats.total else 0 %}
+  {% set pct_active = (stats.in_progress / stats.total * 100) if stats.total else 0 %}
+  <div class="h-full flex">
+    <div class="bg-success h-full" style="width: {{ pct_done }}%"></div>
+    <div class="bg-primary h-full" style="width: {{ pct_active }}%"></div>
+  </div>
+</div>
+
+<!-- Category filter -->
+<div class="flex gap-2 mb-4 flex-wrap">
+  <button onclick="filterTasks('all')" class="filter-btn text-[11px] px-3 py-1 bg-surface border border-border text-text-secondary hover:text-primary hover:border-primary transition-colors" data-filter="all">All</button>
+  <button onclick="filterTasks('core')" class="filter-btn text-[11px] px-3 py-1 bg-surface border border-border text-text-secondary hover:text-primary hover:border-primary transition-colors" data-filter="core">Core</button>
+  <button onclick="filterTasks('ui')" class="filter-btn text-[11px] px-3 py-1 bg-surface border border-border text-text-secondary hover:text-primary hover:border-primary transition-colors" data-filter="ui">UI</button>
+  <button onclick="filterTasks('ai')" class="filter-btn text-[11px] px-3 py-1 bg-surface border border-border text-text-secondary hover:text-primary hover:border-primary transition-colors" data-filter="ai">AI</button>
+  <button onclick="filterTasks('infra')" class="filter-btn text-[11px] px-3 py-1 bg-surface border border-border text-text-secondary hover:text-primary hover:border-primary transition-colors" data-filter="infra">Infra</button>
+  <button onclick="filterTasks('governance')" class="filter-btn text-[11px] px-3 py-1 bg-surface border border-border text-text-secondary hover:text-primary hover:border-primary transition-colors" data-filter="governance">Governance</button>
+  <button onclick="filterTasks('integration')" class="filter-btn text-[11px] px-3 py-1 bg-surface border border-border text-text-secondary hover:text-primary hover:border-primary transition-colors" data-filter="integration">Integration</button>
+</div>
+
+<!-- Task list -->
+<div class="space-y-2" id="task-list">
+  {% for task in tasks %}
+  {% set issue = issues_map.get(task.issue_id) if task.issue_id else None %}
+  {% include "partials/roadmap_row.html" %}
+  {% endfor %}
+</div>
+
+<script>
+function filterTasks(cat) {
+  document.querySelectorAll('.task-row').forEach(function(row) {
+    if (cat === 'all' || row.dataset.category === cat) {
+      row.style.display = '';
+    } else {
+      row.style.display = 'none';
+    }
+  });
+  document.querySelectorAll('.filter-btn').forEach(function(btn) {
+    if (btn.dataset.filter === cat) {
+      btn.classList.add('border-primary', 'text-primary');
+    } else {
+      btn.classList.remove('border-primary', 'text-primary');
+    }
+  });
+}
+</script>
+{% endblock %}

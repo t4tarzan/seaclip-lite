@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% set active = "agents" %}
+{% block title %}{{ agent.name }} — SeaClip Lite{% endblock %}
+{% block content %}
+<div class="flex items-center gap-3 mb-6">
+  <a href="/agents" class="text-[12px] text-text-muted hover:text-primary">&larr; Back</a>
+  <div class="w-10 h-10 flex items-center justify-center bg-{{ 'primary' if agent.status == 'active' else 'error' if agent.status == 'error' else 'bg-alt' }}/20 text-{{ 'primary' if agent.status == 'active' else 'error' if agent.status == 'error' else 'text-muted' }} text-lg font-bold">
+    {{ agent.name[0] }}
+  </div>
+  <div>
+    <h1 class="text-lg font-semibold">{{ agent.name }}</h1>
+    <span class="text-[11px] text-text-muted">{{ agent.role }}</span>
+  </div>
+  <span class="badge ml-auto {{ 'bg-success/20 text-success' if agent.status == 'active' else 'bg-error/20 text-error' if agent.status == 'error' else 'bg-bg-alt text-text-muted' }}">{{ agent.status }}</span>
+</div>
+
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="bg-surface border border-border p-4">
+    <div class="text-[10px] text-text-muted uppercase tracking-wider mb-1">Status</div>
+    <div class="text-[13px] font-semibold {{ 'text-success' if agent.status == 'active' else 'text-error' if agent.status == 'error' else 'text-text-primary' }}">{{ agent.status }}</div>
+  </div>
+  <div class="bg-surface border border-border p-4">
+    <div class="text-[10px] text-text-muted uppercase tracking-wider mb-1">Current Issue</div>
+    {% if agent.current_issue_id and current_issue %}
+    <a href="/issues/{{ current_issue.id }}" class="text-[13px] text-primary hover:underline">{{ current_issue.title[:40] }}</a>
+    {% else %}
+    <div class="text-[13px] text-text-muted">None</div>
+    {% endif %}
+  </div>
+  <div class="bg-surface border border-border p-4">
+    <div class="text-[10px] text-text-muted uppercase tracking-wider mb-1">Last Completed</div>
+    <div class="text-[13px] text-text-secondary">{{ agent.last_completed_at.strftime('%b %d %H:%M') if agent.last_completed_at else 'Never' }}</div>
+  </div>
+</div>
+
+{% if agent.last_error %}
+<div class="bg-error/10 border border-error/30 p-4 mb-6">
+  <div class="text-[10px] text-error uppercase tracking-wider mb-1">Last Error</div>
+  <div class="text-[12px] text-error/80 font-mono whitespace-pre-wrap">{{ agent.last_error }}</div>
+</div>
+{% endif %}
+
+<!-- Recent Activity -->
+<div class="mb-6">
+  <h2 class="text-[13px] font-semibold text-text-secondary mb-3">Recent Activity</h2>
+  {% if activities %}
+  <div class="space-y-2">
+    {% for act in activities %}
+    <div class="bg-surface border border-border px-4 py-2 flex items-center gap-3">
+      <span class="text-[10px] text-text-muted shrink-0">{{ act.created_at.strftime('%b %d %H:%M') if act.created_at else '' }}</span>
+      <span class="text-[12px] text-text-secondary">{{ act.summary }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-[12px] text-text-muted">No activity yet.</div>
+  {% endif %}
+</div>
+
+<!-- Live Terminal View -->
+<div class="mb-6">
+  <div class="flex items-center gap-2 mb-3">
+    <h2 class="text-[13px] font-semibold text-text-secondary">Live Output</h2>
+    <div id="live-dot" class="w-2 h-2 rounded-full {{ 'bg-success pulse-dot' if agent.status == 'active' else 'bg-text-muted' }}"></div>
+  </div>
+  <div id="agent-terminal" class="bg-[#0a0e14] border border-border font-mono text-[11px] leading-5 p-4 overflow-y-auto" style="height: 300px; scroll-behavior: smooth;">
+    <div class="text-text-muted">
+      {% if agent.status == 'active' %}
+      <span class="text-success">●</span> Agent is running — streaming logs...
+      {% else %}
+      <span class="text-text-muted">○</span> Agent is idle. Logs will appear here when the agent starts working.
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+// SSE for live agent logs
+const agentRole = "{{ agent.role }}";
+const terminal = document.getElementById('agent-terminal');
+const liveDot = document.getElementById('live-dot');
+let evtSource = null;
+
+function connectSSE() {
+  if (evtSource) evtSource.close();
+  evtSource = new EventSource('/api/agents/' + agentRole + '/stream');
+
+  evtSource.addEventListener('log', function(e) {
+    const line = document.createElement('div');
+    line.className = 'text-green-400/90';
+    line.textContent = e.data;
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+  });
+
+  evtSource.addEventListener('status', function(e) {
+    const data = JSON.parse(e.data);
+    const line = document.createElement('div');
+    if (data.status === 'active') {
+      line.className = 'text-primary';
+      line.textContent = '▶ ' + data.message;
+      liveDot.className = 'w-2 h-2 rounded-full bg-success pulse-dot';
+    } else if (data.status === 'completed') {
+      line.className = 'text-success';
+      line.textContent = '✓ ' + data.message;
+      liveDot.className = 'w-2 h-2 rounded-full bg-text-muted';
+    } else if (data.status === 'error') {
+      line.className = 'text-error';
+      line.textContent = '✗ ' + data.message;
+      liveDot.className = 'w-2 h-2 rounded-full bg-error';
+    }
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+  });
+
+  evtSource.onerror = function() {
+    // Reconnect after 5s
+    evtSource.close();
+    setTimeout(connectSSE, 5000);
+  };
+}
+
+connectSSE();
+
+// Also poll the page header to update status badge
+setInterval(async () => {
+  try {
+    const r = await fetch('/api/agents/' + agentRole + '/info');
+    if (r.ok) {
+      const data = await r.json();
+      // Update status badge in header
+      const badge = document.querySelector('[data-agent-status]');
+      if (badge) {
+        badge.textContent = data.status;
+        badge.className = 'badge ' + (data.status === 'active' ? 'bg-success/20 text-success' : data.status === 'error' ? 'bg-error/20 text-error' : 'bg-bg-alt text-text-muted');
+      }
+    }
+  } catch {}
+}, 10000);
+</script>
+{% endblock %}

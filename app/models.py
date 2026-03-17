@@ -80,6 +80,19 @@ class ChatSession(Base):
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 
+class BackupJob(Base):
+    """Metadata record for each database backup."""
+    __tablename__ = "backup_jobs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    backup_type = Column(String(10), nullable=False)  # "sqlite" or "json"
+    file_path = Column(String(500), nullable=False)
+    file_size = Column(Integer, default=0)  # bytes
+    status = Column(String(10), default="ok")  # "ok" or "error"
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+
 SEED_AGENTS = [
     {"name": "Curious Charlie", "role": "research"},
     {"name": "Peter Plan", "role": "architect"},

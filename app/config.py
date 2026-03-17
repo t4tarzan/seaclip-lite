@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     github_poll_interval_seconds: int = 30
     host: str = "0.0.0.0"
     port: int = 5200
+    backup_dir: str = "./backups"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

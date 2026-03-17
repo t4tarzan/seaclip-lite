@@ -3,8 +3,9 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import settings
 from ..database import get_db
-from ..models import Issue, Agent, ImportedComment
+from ..models import Issue, Agent, ImportedComment, ActivityLog
 
 router = APIRouter()
 
@@ -19,11 +20,16 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
 
     agents = (await db.execute(select(Agent).order_by(Agent.created_at))).scalars().all()
 
+    activities = (await db.execute(
+        select(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(50)
+    )).scalars().all()
+
     return request.app.state.templates.TemplateResponse("pages/dashboard.html", {
         "request": request,
         "counts": counts,
         "agents": agents,
         "total": sum(counts.values()),
+        "activities": activities,
     })
 
 
@@ -61,6 +67,19 @@ async def agents_page(request: Request, db: AsyncSession = Depends(get_db)):
     return request.app.state.templates.TemplateResponse("pages/agents.html", {
         "request": request,
         "agents": agents,
+    })
+
+
+@router.get("/backup")
+async def backup_page(request: Request, db: AsyncSession = Depends(get_db)):
+    from ..services.backup import list_backups
+    backups = await list_backups(db)
+    last_backup = backups[0] if backups else None
+    return request.app.state.templates.TemplateResponse("pages/backup.html", {
+        "request": request,
+        "backups": backups,
+        "last_backup": last_backup,
+        "backup_dir": settings.backup_dir,
     })
 
 

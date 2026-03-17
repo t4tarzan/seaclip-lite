@@ -1,0 +1,39 @@
+{% if flash %}
+<div class="text-[11px] text-success mb-2">{{ flash }}</div>
+{% endif %}
+{% if configs %}
+<div class="space-y-2">
+  {% for c in configs %}
+  <div class="flex items-center gap-3 bg-bg border border-border px-3 py-2 text-[12px]">
+    <!-- Toggle -->
+    <form hx-post="/api/scheduler/{{ c.id }}/toggle" hx-target="#scheduler-list" hx-swap="innerHTML" class="shrink-0">
+      <button type="submit" class="w-8 h-4 rounded-full relative transition-colors {{ 'bg-success' if c.enabled else 'bg-border' }}" title="{{ 'Enabled' if c.enabled else 'Disabled' }}">
+        <span class="absolute top-0.5 {{ 'right-0.5' if c.enabled else 'left-0.5' }} w-3 h-3 rounded-full bg-white transition-all"></span>
+      </button>
+    </form>
+    <!-- Repo -->
+    <span class="font-mono text-text-primary {{ 'opacity-50' if not c.enabled else '' }}">{{ c.repo }}</span>
+    <!-- Config badges -->
+    <span class="text-[10px] text-text-muted bg-bg-alt px-1.5 py-0.5">every {{ c.interval_minutes }}m</span>
+    <span class="text-[10px] text-text-muted bg-bg-alt px-1.5 py-0.5">→ {{ c.target_column }}</span>
+    {% if c.auto_pipeline %}
+    <span class="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5">auto-pipeline ({{ c.pipeline_mode }})</span>
+    {% endif %}
+    <!-- Stats -->
+    <span class="text-[10px] text-text-muted ml-auto">{{ c.issues_synced or 0 }} synced</span>
+    {% if c.last_synced_at %}
+    <span class="text-[10px] text-text-muted">last: {{ c.last_synced_at.strftime('%H:%M') }}</span>
+    {% endif %}
+    <!-- Actions -->
+    <form hx-post="/api/scheduler/{{ c.id }}/sync" hx-target="#scheduler-list" hx-swap="innerHTML" class="shrink-0">
+      <button type="submit" class="text-[10px] text-primary hover:underline">Sync Now</button>
+    </form>
+    <form hx-post="/api/scheduler/{{ c.id }}/delete" hx-target="#scheduler-list" hx-swap="innerHTML" class="shrink-0">
+      <button type="submit" class="text-[10px] text-error hover:underline">Remove</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="text-[11px] text-text-muted py-2">No scheduled repos. Add one above to auto-sync GitHub issues.</p>
+{% endif %}

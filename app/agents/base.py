@@ -5,18 +5,28 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Agent, Issue, ActivityLog
+from ..models import Agent, Issue, ActivityLog, ImportedComment
 from ..services import ai, github
 from ..services.events import event_bus
 
 logger = logging.getLogger("seaclip.agents")
+
+# Maps each agent to the next agent name for handoff messages
+NEXT_AGENT = {
+    "research": "Peter Plan (Architect)",
+    "architect": "David Dev (Developer)",
+    "developer": "Test Tina (Tester)",
+    "tester": "Sceptic Suzy (Reviewer)",
+    "reviewer": "Merge Matthews (Release)",
+    "release": None,
+}
 
 
 class BaseAgent:
     name: str = ""
     role: str = ""
     trigger_label: str = ""
-    completion_label: str | None = None  # None for Matthews (closes issue instead)
+    completion_label: str | None = None
 
     def build_prompt(self, issue: Issue) -> str:
         """Build the strict-context prompt for this agent."""
@@ -36,28 +46,53 @@ class BaseAgent:
             f"Issue: {issue.title}\n\n"
             f"Description:\n{issue.description or 'No description'}\n\n"
         )
-        return header + self._instructions(issue)
+
+        output_format = (
+            f"\n\n--- CRITICAL OUTPUT RULES ---\n"
+            f"1. Return your findings/work as structured markdown to STDOUT.\n"
+            f"2. Do NOT post comments on GitHub yourself — do NOT run 'gh issue comment' or any variant.\n"
+            f"3. Do NOT add labels — do NOT run 'gh issue edit --add-label' or curl to the labels API.\n"
+            f"4. Do NOT close issues — do NOT run 'gh issue close'.\n"
+            f"5. Your stdout text will be automatically posted as a GitHub comment by the pipeline system.\n"
+            f"6. Labels are automatically applied by the pipeline system after your work.\n"
+            f"7. Just output your analysis/findings/work summary as plain markdown text.\n"
+            f"8. Be thorough but concise. Use headings, bullet points, tables, and code blocks.\n"
+        )
+
+        return header + self._instructions(issue) + output_format
 
     def _instructions(self, issue: Issue) -> str:
         """Override in subclasses to provide agent-specific instructions."""
         return ""
 
     def _label_cmd(self, issue: Issue, label: str) -> str:
+        """Legacy label instruction — labels are now applied by the pipeline system."""
+        return ""
+
+    def _format_github_comment(self, issue: Issue, output: str) -> str:
+        """Format the agent output as a structured GitHub comment."""
         repo = issue.github_repo
         num = issue.github_issue_number
-        return (
-            f"CRITICAL — YOUR LAST STEP (do NOT skip):\n"
-            f"Run this exact command:\n"
-            f"  gh issue edit {num} --repo {repo} --add-label \"{label}\"\n"
-            f"If that fails, use curl:\n"
-            f"  curl -s -X POST -H \"Authorization: token $GITHUB_TOKEN\" "
-            f"-H \"Content-Type: application/json\" "
-            f"https://api.github.com/repos/{repo}/issues/{num}/labels "
-            f"-d '{{\"labels\":[\"{label}\"]}}'"
-        )
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        next_agent = NEXT_AGENT.get(self.role)
+
+        comment = f"## {self.name}\n\n"
+        comment += f"**Repo:** [`{repo}`](https://github.com/{repo}) · "
+        comment += f"**Issue:** [#{num}](https://github.com/{repo}/issues/{num}) · "
+        comment += f"**Date:** {now}\n\n"
+        comment += "---\n\n"
+        comment += output.strip()
+        comment += "\n\n---\n\n"
+
+        if next_agent:
+            comment += f"**Handoff →** {next_agent}\n"
+        else:
+            comment += "**Pipeline complete** — issue closed.\n"
+
+        return comment
 
     async def run(self, issue: Issue, db: AsyncSession) -> str:
-        """Execute the agent: mark active, run AI, apply label, mark idle."""
+        """Execute the agent: mark active, run AI, post comment, apply label, mark idle."""
         # Find this agent in DB
         result = await db.execute(select(Agent).where(Agent.role == self.role))
         agent = result.scalar_one_or_none()
@@ -72,15 +107,60 @@ class BaseAgent:
         await event_bus.publish("agents", "agent.active", {"agent": agent.name, "issue": issue.title})
 
         try:
-            # Run AI
+            # Run AI — respect ai_mode on the issue
             prompt = self.build_prompt(issue)
-            logger.info("Running %s for issue %s", self.name, issue.id[:8])
-            output = await ai.claude_chat(prompt)
+            ai_mode = getattr(issue, "ai_mode", "claude") or "claude"
+            logger.info("Running %s for issue %s (ai_mode=%s)", self.name, issue.id[:8], ai_mode)
+            await event_bus.publish("agents", "agent.log", {"agent": agent.name, "message": f"Building prompt ({len(prompt)} chars) — ai_mode={ai_mode}"})
+
+            # Live log callback — publishes events to SSE stream
+            async def _on_log(line: str):
+                await event_bus.publish("agents", "agent.log", {
+                    "agent": agent.name, "message": line,
+                })
+
+            if ai_mode == "local":
+                output = await ai.ollama_generate(prompt, timeout=600)
+            elif ai_mode == "hybrid":
+                if self.role in ("developer", "tester", "release"):
+                    output = await ai.claude_chat(prompt, timeout=600, on_log=_on_log)
+                else:
+                    try:
+                        output = await ai.ollama_generate(prompt, timeout=600)
+                    except Exception:
+                        logger.warning("%s Ollama failed, falling back to Claude", self.name)
+                        output = await ai.claude_chat(prompt, timeout=600, on_log=_on_log)
+            else:
+                output = await ai.claude_chat(prompt, timeout=600, on_log=_on_log)
+
+            await event_bus.publish("agents", "agent.log", {"agent": agent.name, "message": f"AI returned {len(output)} chars"})
+
+            # Post formatted comment on GitHub + save to DB immediately
+            if issue.github_repo and issue.github_issue_number:
+                comment_body = self._format_github_comment(issue, output)
+                try:
+                    resp = await github.post_comment(issue.github_repo, issue.github_issue_number, comment_body)
+                    gh_comment_id = resp.get("id", 0)
+                    logger.info("%s posted comment on GitHub #%s", self.name, issue.github_issue_number)
+                    await event_bus.publish("agents", "agent.log", {"agent": agent.name, "message": f"Posted comment on GitHub #{issue.github_issue_number}"})
+
+                    # Save directly to DB so it shows on issue detail immediately
+                    imp = ImportedComment(
+                        issue_id=issue.id,
+                        github_comment_id=gh_comment_id,
+                        body=comment_body,
+                        author=self.name,
+                    )
+                    db.add(imp)
+                    await db.commit()
+                except Exception as e:
+                    logger.warning("%s failed to post comment: %s", self.name, e)
 
             # Apply completion label on GitHub
             if self.completion_label and issue.github_repo and issue.github_issue_number:
                 await github.add_label(issue.github_repo, issue.github_issue_number, self.completion_label)
                 logger.info("%s applied label '%s'", self.name, self.completion_label)
+                await event_bus.publish("agents", "agent.log", {"agent": agent.name, "message": f"Applied label: {self.completion_label}"})
 
             # Mark idle
             agent.status = "idle"
