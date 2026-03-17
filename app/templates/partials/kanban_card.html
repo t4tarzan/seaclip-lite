@@ -1,0 +1,17 @@
+<div class="bg-bg-alt border border-border p-3 cursor-grab active:cursor-grabbing hover:border-border-hover transition-colors group"
+     draggable="true"
+     ondragstart="event.dataTransfer.setData('text/plain', '{{ issue.id }}')">
+  <a href="/issues/{{ issue.id }}" class="block">
+    <div class="flex items-start justify-between gap-2 mb-2">
+      <p class="text-[12px] font-medium text-text-primary leading-snug group-hover:text-white line-clamp-2">{{ issue.title }}</p>
+      <span class="text-[10px] shrink-0 {{ 'text-error' if issue.priority == 'urgent' else 'text-warning' if issue.priority == 'high' else 'text-primary' if issue.priority == 'medium' else 'text-text-muted' }}">{{ issue.priority[0]|upper }}</span>
+    </div>
+    <div class="flex items-center gap-2 text-[10px] text-text-muted">
+      {% if issue.github_repo %}<span class="truncate">{{ issue.github_repo }}</span>{% endif %}
+      {% if issue.pipeline_stage %}<span class="badge bg-primary/20 text-primary">{{ issue.pipeline_stage }}</span>{% endif %}
+    </div>
+  </a>
+  <button hx-delete="/api/issues/{{ issue.id }}" hx-confirm="Delete?" hx-target="closest div[draggable]" hx-swap="outerHTML"
+    class="hidden group-hover:block absolute top-2 right-2 text-error/60 hover:text-error text-[10px]"
+    onclick="event.stopPropagation(); event.preventDefault();">✕</button>
+</div>

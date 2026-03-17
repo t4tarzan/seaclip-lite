@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% set active = "agents" %}
+{% block title %}Agents — SeaClip Lite{% endblock %}
+{% block content %}
+<h1 class="text-lg font-semibold mb-6">Pipeline Agents</h1>
+
+<div id="agent-list" hx-get="/api/agents" hx-trigger="every 10s" hx-swap="innerHTML">
+  {% include "partials/agent_list.html" %}
+</div>
+{% endblock %}

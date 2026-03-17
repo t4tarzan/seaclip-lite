@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% set active = "identify" %}
+{% block title %}Identify — SeaClip Lite{% endblock %}
+{% block content %}
+<div class="flex flex-col" style="height: calc(100vh - 100px);">
+  <!-- Repo selector -->
+  <div class="flex items-center gap-3 pb-3 border-b border-border mb-4 flex-shrink-0">
+    <span class="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Context</span>
+    <select id="repo-select" class="bg-bg border border-border text-[12px] px-3 py-1.5 text-text-primary outline-none focus:border-primary flex-1 max-w-sm">
+      <option value="">No repo selected</option>
+      {% for repo in repos %}
+      <option value="{{ repo.full_name }}">{{ repo.full_name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- Messages -->
+  <div id="messages" class="flex-1 overflow-y-auto flex flex-col gap-4 pb-4">
+    <div id="empty-state" class="flex-1 flex flex-col items-center justify-center text-text-muted">
+      <span class="text-[14px] font-medium">Start a conversation</span>
+      <span class="text-[12px]">Discuss ideas, debug issues, or explore a codebase.</span>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="flex-shrink-0 border-t border-border pt-3 flex gap-2 items-end">
+    <button id="create-issue-btn" class="hidden bg-surface border border-border text-[12px] px-3 py-2 text-text-secondary hover:text-primary transition-colors shrink-0"
+      onclick="extractIssue()">+ Create Issue</button>
+    <textarea id="chat-input" rows="1" placeholder="Ask about the codebase..."
+      class="flex-1 bg-surface border border-border text-[13px] px-3 py-2 text-text-primary outline-none focus:border-primary resize-none"
+      style="max-height: 120px;"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage();}"></textarea>
+    <button onclick="sendMessage()" class="bg-primary text-white px-3 py-2 text-[13px] hover:bg-primary-hover shrink-0">Send</button>
+  </div>
+</div>
+
+<script>
+let chatMessages = [];
+
+function getRepo() { return document.getElementById('repo-select').value; }
+
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  // Hide empty state
+  const empty = document.getElementById('empty-state');
+  if (empty) empty.remove();
+
+  // Add user message
+  chatMessages.push({role: 'user', content: text});
+  addBubble('user', text);
+
+  // Show create issue button after 2 messages
+  if (chatMessages.length >= 2) {
+    document.getElementById('create-issue-btn').classList.remove('hidden');
+  }
+
+  // Send to server
+  const form = new FormData();
+  form.append('messages', JSON.stringify(chatMessages));
+  form.append('repo', getRepo());
+
+  const res = await fetch('/api/identify/chat', { method: 'POST', body: form });
+  const html = await res.text();
+
+  // Parse reply text from the returned HTML
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  const replyText = tmp.textContent.trim();
+  chatMessages.push({role: 'assistant', content: replyText});
+
+  document.getElementById('messages').insertAdjacentHTML('beforeend', html);
+  document.getElementById('messages').scrollTop = 99999;
+}
+
+async function extractIssue() {
+  const form = new FormData();
+  form.append('messages', JSON.stringify(chatMessages));
+  form.append('repo', getRepo());
+
+  const res = await fetch('/api/identify/extract-issue', { method: 'POST', body: form });
+  const html = await res.text();
+  document.getElementById('messages').insertAdjacentHTML('beforeend', html);
+  document.getElementById('messages').scrollTop = 99999;
+}
+
+function addBubble(role, content) {
+  const div = document.createElement('div');
+  div.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+  div.innerHTML = `<div class="max-w-[75%] px-4 py-3 text-[13px] leading-relaxed whitespace-pre-wrap ${
+    role === 'user' ? 'bg-primary text-white' : 'bg-surface border border-border text-text-primary'
+  }">${content}</div>`;
+  document.getElementById('messages').appendChild(div);
+  document.getElementById('messages').scrollTop = 99999;
+}
+</script>
+{% endblock %}

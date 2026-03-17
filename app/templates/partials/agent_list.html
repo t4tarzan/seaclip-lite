@@ -1,0 +1,24 @@
+<div class="grid grid-cols-2 gap-4">
+  {% for agent in agents %}
+  <div class="bg-surface border border-border p-4 flex items-center gap-4 transition-all {{ 'glow-active' if agent.status == 'active' else 'glow-error' if agent.status == 'error' else '' }}">
+    <div class="flex flex-col items-center gap-1">
+      <div class="w-10 h-10 flex items-center justify-center bg-{{ 'primary' if agent.status == 'active' else 'error' if agent.status == 'error' else 'bg-alt' }}/20 text-{{ 'primary' if agent.status == 'active' else 'error' if agent.status == 'error' else 'text-muted' }} text-sm font-bold">
+        {{ agent.name[0] }}
+      </div>
+      <div class="w-2 h-2 rounded-full {{ 'bg-success pulse-dot' if agent.status == 'active' else 'bg-error' if agent.status == 'error' else 'bg-text-muted' }}"></div>
+    </div>
+    <div class="flex-1">
+      <div class="text-[13px] font-semibold text-text-primary">{{ agent.name }}</div>
+      <div class="text-[11px] text-text-muted">{{ agent.role }}</div>
+      {% if agent.status == 'active' %}
+      <div class="text-[11px] text-success mt-1">Working...</div>
+      {% elif agent.status == 'error' %}
+      <div class="text-[11px] text-error mt-1">{{ agent.last_error[:60] if agent.last_error else 'Error' }}</div>
+      {% elif agent.last_completed_at %}
+      <div class="text-[10px] text-text-muted mt-1">Last active: {{ agent.last_completed_at.strftime('%b %d %H:%M') }}</div>
+      {% endif %}
+    </div>
+    <span class="badge {{ 'bg-success/20 text-success' if agent.status == 'active' else 'bg-error/20 text-error' if agent.status == 'error' else 'bg-bg-alt text-text-muted' }}">{{ agent.status }}</span>
+  </div>
+  {% endfor %}
+</div>

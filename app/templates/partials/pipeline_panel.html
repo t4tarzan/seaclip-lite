@@ -1,0 +1,70 @@
+<div class="bg-surface border border-border p-5 flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <h4 class="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">Pipeline</h4>
+    <div class="flex items-center gap-2">
+      {% if issue.pipeline_mode %}
+      <span class="badge {{ 'bg-warning/20 text-warning' if issue.pipeline_mode == 'manual' else 'bg-success/20 text-success' }}">{{ issue.pipeline_mode }}</span>
+      {% endif %}
+      {% if issue.pipeline_stage %}
+      <span class="badge bg-primary/20 text-primary">{{ issue.pipeline_stage }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if issue.github_issue_url %}
+  <a href="{{ issue.github_issue_url }}" target="_blank" class="text-[12px] text-primary hover:underline">
+    GitHub #{{ issue.github_issue_number }}
+  </a>
+  {% endif %}
+
+  {% if not issue.github_issue_number and issue.github_repo %}
+  {# State A: No GitHub issue yet #}
+  <form hx-post="/api/pipeline/{{ issue.id }}/sync-github" hx-target="#pipeline-panel" hx-swap="innerHTML">
+    <button type="submit" class="w-full bg-surface border border-border text-[12px] px-3 py-2 text-text-secondary hover:text-primary hover:border-primary transition-colors">
+      Create GitHub Issue
+    </button>
+  </form>
+
+  {% elif issue.github_issue_number and not issue.pipeline_stage %}
+  {# State B: GitHub issue exists, pipeline not started #}
+  <div class="flex gap-2">
+    <form hx-post="/api/pipeline/{{ issue.id }}/start" hx-target="#pipeline-panel" hx-swap="innerHTML" class="flex-1">
+      <input type="hidden" name="mode" value="auto">
+      <button type="submit" class="w-full bg-primary text-white text-[12px] px-3 py-2 hover:bg-primary-hover">Start Auto</button>
+    </form>
+    <form hx-post="/api/pipeline/{{ issue.id }}/start" hx-target="#pipeline-panel" hx-swap="innerHTML" class="flex-1">
+      <input type="hidden" name="mode" value="manual">
+      <button type="submit" class="w-full bg-surface border border-border text-[12px] px-3 py-2 text-text-secondary hover:text-primary hover:border-primary">Start Manual</button>
+    </form>
+  </div>
+
+  {% elif issue.pipeline_stage == 'completed' %}
+  {# State C: Completed #}
+  <span class="text-[12px] text-success font-medium">Pipeline completed</span>
+
+  {% elif issue.pipeline_mode == 'manual' and issue.pipeline_waiting %}
+  {# State D: Manual mode — waiting for trigger #}
+  <span class="text-[11px] text-warning">Waiting for manual trigger...</span>
+  <form hx-post="/api/pipeline/{{ issue.id }}/resume" hx-target="#pipeline-panel" hx-swap="innerHTML">
+    <input type="hidden" name="stage" value="{{ issue.pipeline_waiting }}">
+    <button type="submit" class="w-full bg-warning/90 text-bg text-[12px] px-3 py-2 font-semibold hover:bg-warning transition-colors">
+      Start {{ stage_agent_name.get(issue.pipeline_waiting, 'Next Agent') }}
+    </button>
+  </form>
+
+  {% elif issue.pipeline_stage and not issue.pipeline_waiting %}
+  {# State E: Pipeline running #}
+  <span class="text-[11px] text-text-muted">
+    {{ 'Agent working...' if issue.pipeline_mode == 'manual' else 'Pipeline running...' }}
+  </span>
+  <form hx-post="/api/pipeline/{{ issue.id }}/stop" hx-target="#pipeline-panel" hx-swap="innerHTML">
+    <button type="submit" class="w-full bg-error/20 border border-error/30 text-error text-[12px] px-3 py-2 hover:bg-error/30 transition-colors">
+      Stop Pipeline
+    </button>
+  </form>
+  {% endif %}
+
+  {% if not issue.github_repo %}
+  <span class="text-[11px] text-text-muted">No GitHub repo linked. Edit the issue to add one.</span>
+  {% endif %}
+</div>

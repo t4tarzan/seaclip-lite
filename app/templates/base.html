@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}SeaClip Lite{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            bg: '#0d1117', 'bg-alt': '#161b22', surface: '#1c2333',
+            border: '#30363d', 'border-hover': '#484f58',
+            'text-primary': '#e6edf3', 'text-secondary': '#8b949e', 'text-muted': '#7d8590',
+            primary: '#2f81f7', 'primary-hover': '#388bfd',
+            success: '#3fb950', error: '#f85149', warning: '#d29922',
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <style>
+    body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #161b22; }
+    ::-webkit-scrollbar-thumb { background: #30363d; }
+    .glow-active { box-shadow: 0 0 12px rgba(47, 129, 247, 0.4); border-color: #2f81f7; }
+    .glow-error { box-shadow: 0 0 12px rgba(248, 81, 73, 0.4); border-color: #f85149; }
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+    .htmx-indicator { opacity: 0; transition: opacity 200ms; }
+    .htmx-request .htmx-indicator { opacity: 1; }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+  </style>
+</head>
+<body class="min-h-screen flex">
+  <!-- Sidebar -->
+  <nav class="w-52 bg-bg-alt border-r border-border flex flex-col py-4 px-3 shrink-0">
+    <div class="text-primary font-bold text-sm tracking-wider mb-6 px-2">SEACLIP LITE</div>
+    <a href="/" class="sidebar-link {% if active == 'dashboard' %}bg-surface text-primary{% else %}text-text-secondary hover:text-text-primary hover:bg-surface/50{% endif %} px-3 py-2 text-[13px] mb-1 transition-colors">Dashboard</a>
+    <a href="/kanban" class="sidebar-link {% if active == 'kanban' %}bg-surface text-primary{% else %}text-text-secondary hover:text-text-primary hover:bg-surface/50{% endif %} px-3 py-2 text-[13px] mb-1 transition-colors">Kanban</a>
+    <a href="/identify" class="sidebar-link {% if active == 'identify' %}bg-surface text-primary{% else %}text-text-secondary hover:text-text-primary hover:bg-surface/50{% endif %} px-3 py-2 text-[13px] mb-1 transition-colors">Identify</a>
+    <a href="/agents" class="sidebar-link {% if active == 'agents' %}bg-surface text-primary{% else %}text-text-secondary hover:text-text-primary hover:bg-surface/50{% endif %} px-3 py-2 text-[13px] mb-1 transition-colors">Agents</a>
+    <div class="mt-auto text-[10px] text-text-muted px-2">Port 5200 · FastAPI + HTMX</div>
+  </nav>
+
+  <!-- Main -->
+  <main class="flex-1 overflow-auto">
+    <div class="max-w-7xl mx-auto px-6 py-5">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <!-- Toast container -->
+  <div id="toast-container" class="fixed bottom-4 right-4 flex flex-col gap-2 z-50"></div>
+</body>
+</html>

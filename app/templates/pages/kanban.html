@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% set active = "kanban" %}
+{% block title %}Kanban — SeaClip Lite{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-lg font-semibold">Kanban Board</h1>
+  <button onclick="document.getElementById('new-issue-modal').classList.remove('hidden')"
+    class="bg-primary text-white text-[12px] px-3 py-1.5 hover:bg-primary-hover transition-colors">
+    + New Issue
+  </button>
+</div>
+
+<div class="flex gap-4 overflow-x-auto pb-4" style="min-height: 70vh;">
+  {% for status, label in [('backlog','Backlog'),('todo','Todo'),('in_progress','In Progress'),('in_review','In Review'),('done','Done')] %}
+  <div class="flex flex-col flex-1 min-w-[200px]"
+       ondragover="event.preventDefault(); this.querySelector('.drop-zone').classList.add('border-primary/40','bg-primary/5')"
+       ondragleave="this.querySelector('.drop-zone').classList.remove('border-primary/40','bg-primary/5')"
+       ondrop="handleDrop(event, '{{ status }}')">
+    <div class="flex items-center gap-2 mb-3 px-1">
+      <span class="text-[12px] font-semibold text-text-primary">{{ label }}</span>
+      <span class="ml-auto text-[10px] font-mono text-text-muted bg-bg-alt px-1.5 py-0.5">{{ columns[status]|length }}</span>
+    </div>
+    <div class="drop-zone flex-1 min-h-[120px] bg-bg-alt/30 p-2 space-y-2 border border-transparent transition-colors" id="col-{{ status }}">
+      {% for issue in columns[status] %}
+        {% include "partials/kanban_card.html" %}
+      {% endfor %}
+      {% if not columns[status] %}
+      <p class="text-[11px] text-border-hover text-center pt-10">No issues</p>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- New Issue Modal -->
+<div id="new-issue-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+  <div class="bg-surface border border-border p-6 w-full max-w-md">
+    <h3 class="text-sm font-semibold mb-4">New Issue</h3>
+    <form hx-post="/api/issues" hx-target="#col-backlog" hx-swap="beforeend" hx-on::after-request="document.getElementById('new-issue-modal').classList.add('hidden'); this.reset();">
+      <input name="title" placeholder="Issue title" required class="w-full bg-bg border border-border text-[13px] px-3 py-2 mb-3 text-text-primary outline-none focus:border-primary">
+      <textarea name="description" placeholder="Description (markdown)" rows="4" class="w-full bg-bg border border-border text-[13px] px-3 py-2 mb-3 text-text-primary outline-none focus:border-primary resize-none"></textarea>
+      <select name="priority" class="w-full bg-bg border border-border text-[13px] px-3 py-2 mb-3 text-text-primary outline-none">
+        <option value="low">Low</option>
+        <option value="medium" selected>Medium</option>
+        <option value="high">High</option>
+        <option value="urgent">Urgent</option>
+      </select>
+      <input name="github_repo" placeholder="GitHub repo (owner/repo)" class="w-full bg-bg border border-border text-[13px] px-3 py-2 mb-4 text-text-primary outline-none focus:border-primary">
+      <div class="flex gap-2 justify-end">
+        <button type="button" onclick="this.closest('#new-issue-modal').classList.add('hidden')" class="text-[12px] px-3 py-1.5 border border-border text-text-muted hover:text-text-primary">Cancel</button>
+        <button type="submit" class="text-[12px] px-3 py-1.5 bg-primary text-white hover:bg-primary-hover">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function handleDrop(e, status) {
+  e.preventDefault();
+  const issueId = e.dataTransfer.getData('text/plain');
+  if (!issueId) return;
+  const form = new FormData();
+  form.append('status', status);
+  fetch(`/api/issues/${issueId}/move`, { method: 'POST', body: form })
+    .then(() => location.reload());
+}
+</script>
+{% endblock %}
