@@ -29,28 +29,12 @@
 <!-- Activity Feed -->
 <div class="mt-8">
   <h2 class="text-sm font-semibold mb-3 text-text-secondary">Recent Activity</h2>
-  <div class="bg-surface border border-border overflow-y-auto" style="max-height: 360px;">
-    {% if activities %}
-    {% for a in activities %}
-    <div class="flex items-start gap-3 px-4 py-2.5 border-b border-border/50 text-[12px] {{ 'bg-bg-alt/30' if loop.index is odd else '' }}">
-      {% if 'completed' in a.event_type %}
-      <span class="text-success shrink-0 mt-0.5">&#10003;</span>
-      {% elif 'error' in a.event_type or 'failed' in a.event_type %}
-      <span class="text-error shrink-0 mt-0.5">&#10007;</span>
-      {% elif 'started' in a.event_type %}
-      <span class="text-primary shrink-0 mt-0.5">&#9654;</span>
-      {% elif 'sync' in a.event_type %}
-      <span class="text-warning shrink-0 mt-0.5">&#8635;</span>
-      {% else %}
-      <span class="text-text-muted shrink-0 mt-0.5">&#8226;</span>
-      {% endif %}
-      <span class="text-text-primary flex-1 min-w-0 truncate">{{ a.summary }}</span>
-      <span class="text-text-muted text-[10px] shrink-0">{{ a.created_at.strftime('%b %d %H:%M') if a.created_at else '' }}</span>
-    </div>
-    {% endfor %}
-    {% else %}
-    <p class="text-[11px] text-text-muted text-center py-8">No activity yet</p>
-    {% endif %}
+  <div id="activity-feed"
+       class="bg-surface border border-border overflow-y-auto"
+       style="max-height: 360px;"
+       hx-get="/api/activity"
+       hx-trigger="load, every 15s"
+       hx-swap="innerHTML">
   </div>
 </div>
 {% endblock %}

@@ -104,7 +104,10 @@ async def _scheduler_loop():
                     # Check if it's time to sync
                     interval = (config.interval_minutes or 15) * 60  # seconds
                     if config.last_synced_at:
-                        elapsed = (datetime.now(timezone.utc) - config.last_synced_at).total_seconds()
+                        last = config.last_synced_at
+                        if last.tzinfo is None:
+                            last = last.replace(tzinfo=timezone.utc)
+                        elapsed = (datetime.now(timezone.utc) - last).total_seconds()
                         if elapsed < interval:
                             continue
 

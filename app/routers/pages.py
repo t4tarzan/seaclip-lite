@@ -20,15 +20,21 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
 
     agents = (await db.execute(select(Agent).order_by(Agent.created_at))).scalars().all()
 
-    activities = (await db.execute(
-        select(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(50)
-    )).scalars().all()
-
     return request.app.state.templates.TemplateResponse("pages/dashboard.html", {
         "request": request,
         "counts": counts,
         "agents": agents,
         "total": sum(counts.values()),
+    })
+
+
+@router.get("/api/activity")
+async def activity_feed(request: Request, db: AsyncSession = Depends(get_db)):
+    activities = (await db.execute(
+        select(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(20)
+    )).scalars().all()
+    return request.app.state.templates.TemplateResponse("partials/activity_feed.html", {
+        "request": request,
         "activities": activities,
     })
 

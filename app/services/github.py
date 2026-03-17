@@ -48,6 +48,19 @@ async def list_org_repos(org: str | None = None) -> list[dict]:
     ]
 
 
+async def list_repo_issues(repo: str, state: str = "open") -> list[dict]:
+    """List issues for a repo. Returns list of dicts with number, title, body, url."""
+    client = await get_client()
+    r = await client.get(f"/repos/{repo}/issues", params={"state": state, "per_page": 100})
+    if r.status_code != 200:
+        return []
+    return [
+        {"number": i["number"], "title": i["title"], "body": i.get("body"), "url": i["html_url"]}
+        for i in r.json()
+        if "pull_request" not in i  # exclude PRs
+    ]
+
+
 async def create_issue(repo: str, title: str, body: str) -> dict:
     client = await get_client()
     r = await client.post(f"/repos/{repo}/issues", json={"title": title, "body": body})

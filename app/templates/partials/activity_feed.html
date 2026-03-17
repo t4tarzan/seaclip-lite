@@ -1,0 +1,25 @@
+{% for a in activities %}
+<div class="flex items-start gap-3 px-4 py-2.5 border-b border-border/50 text-[12px] {{ 'bg-bg-alt/30' if loop.index is odd else '' }}">
+  {% if a.event_type in ('agent.completed', 'pipeline.completed') %}
+  <span class="text-success shrink-0 mt-0.5">&#10003;</span>
+  {% elif a.event_type == 'agent.error' %}
+  <span class="text-error shrink-0 mt-0.5">&#10007;</span>
+  {% elif a.event_type == 'pipeline.started' %}
+  <span class="text-primary shrink-0 mt-0.5">&#9654;</span>
+  {% elif 'completed' in a.event_type %}
+  <span class="text-success shrink-0 mt-0.5">&#10003;</span>
+  {% elif 'error' in a.event_type or 'failed' in a.event_type %}
+  <span class="text-error shrink-0 mt-0.5">&#10007;</span>
+  {% elif 'started' in a.event_type %}
+  <span class="text-primary shrink-0 mt-0.5">&#9654;</span>
+  {% elif 'sync' in a.event_type %}
+  <span class="text-warning shrink-0 mt-0.5">&#8635;</span>
+  {% else %}
+  <span class="text-text-muted shrink-0 mt-0.5">&#8226;</span>
+  {% endif %}
+  <span class="text-text-primary flex-1 min-w-0 truncate">{{ a.summary }}</span>
+  <span class="text-text-muted text-[10px] shrink-0">{{ a.created_at.strftime('%b %d %H:%M') if a.created_at else '' }}</span>
+</div>
+{% else %}
+<p class="text-[11px] text-text-muted text-center py-8">No activity yet</p>
+{% endfor %}
