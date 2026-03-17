@@ -16,20 +16,13 @@
     <div class="bg-surface border border-border p-4 mb-6 text-[13px] text-text-secondary whitespace-pre-wrap leading-relaxed">{{ issue.description }}</div>
     {% endif %}
 
-    <!-- GitHub Comments -->
-    {% if comments %}
-    <h2 class="text-[13px] font-semibold text-text-secondary mb-3">GitHub Comments ({{ comments|length }})</h2>
-    <div class="space-y-3 mb-6">
-      {% for comment in comments %}
-      <div class="bg-surface border border-border p-3">
-        <div class="text-[11px] text-text-muted mb-2">
-          <span class="font-semibold text-primary">{{ comment.author }}</span> · {{ comment.created_at.strftime('%b %d, %H:%M') if comment.created_at else '' }}
-        </div>
-        <div class="text-[12px] text-text-secondary whitespace-pre-wrap leading-relaxed">{{ comment.body[:500] }}{% if comment.body|length > 500 %}...{% endif %}</div>
-      </div>
-      {% endfor %}
+    <!-- GitHub Comments (auto-refreshes every 10s via HTMX) -->
+    <div id="comments-panel"
+         hx-get="/api/issues/{{ issue.id }}/comments"
+         hx-trigger="load, every 10s"
+         hx-swap="innerHTML">
+      {% include "partials/comments_list.html" %}
     </div>
-    {% endif %}
 
     <button hx-delete="/api/issues/{{ issue.id }}" hx-confirm="Delete this issue?" hx-on::after-request="window.location='/kanban'"
       class="text-[11px] text-error border border-error/30 px-3 py-1 hover:bg-error/10 transition-colors">Delete Issue</button>

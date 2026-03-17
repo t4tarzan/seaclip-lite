@@ -116,6 +116,19 @@ async def roadmap(request: Request, db: AsyncSession = Depends(get_db)):
     })
 
 
+@router.get("/api/issues/{issue_id}/comments")
+async def issue_comments_partial(request: Request, issue_id: str, db: AsyncSession = Depends(get_db)):
+    comments = (await db.execute(
+        select(ImportedComment)
+        .where(ImportedComment.issue_id == issue_id)
+        .order_by(ImportedComment.created_at)
+    )).scalars().all()
+    return request.app.state.templates.TemplateResponse("partials/comments_list.html", {
+        "request": request,
+        "comments": comments,
+    })
+
+
 @router.get("/issues/{issue_id}")
 async def issue_detail(request: Request, issue_id: str, db: AsyncSession = Depends(get_db)):
     issue = await db.get(Issue, issue_id)
