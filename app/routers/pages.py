@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..database import get_db
-from ..models import Issue, Agent, ImportedComment, ActivityLog
+from ..models import Issue, Agent, ImportedComment, ActivityLog, DevTask
 
 router = APIRouter()
 
@@ -45,9 +45,13 @@ async def kanban(request: Request, db: AsyncSession = Depends(get_db)):
         if issue.status in columns:
             columns[issue.status].append(issue)
 
+    from ..services.github import list_org_repos
+    repos = await list_org_repos()
+
     return request.app.state.templates.TemplateResponse("pages/kanban.html", {
         "request": request,
         "columns": columns,
+        "repos": repos,
     })
 
 
@@ -80,6 +84,29 @@ async def backup_page(request: Request, db: AsyncSession = Depends(get_db)):
         "backups": backups,
         "last_backup": last_backup,
         "backup_dir": settings.backup_dir,
+    })
+
+
+@router.get("/roadmap")
+async def roadmap(request: Request, db: AsyncSession = Depends(get_db)):
+    tasks = (await db.execute(select(DevTask).order_by(DevTask.priority))).scalars().all()
+    stats = {
+        "total": len(tasks),
+        "planned": sum(1 for t in tasks if t.status == "planned"),
+        "in_progress": sum(1 for t in tasks if t.status == "in_progress"),
+        "done": sum(1 for t in tasks if t.status == "done"),
+    }
+    issue_ids = [t.issue_id for t in tasks if t.issue_id]
+    issues_map = {}
+    if issue_ids:
+        result = await db.execute(select(Issue).where(Issue.id.in_(issue_ids)))
+        issues_map = {i.id: i for i in result.scalars().all()}
+
+    return request.app.state.templates.TemplateResponse("pages/roadmap.html", {
+        "request": request,
+        "tasks": tasks,
+        "stats": stats,
+        "issues_map": issues_map,
     })
 
 

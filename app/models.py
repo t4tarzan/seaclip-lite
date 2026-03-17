@@ -28,6 +28,7 @@ class Issue(Base):
     pipeline_stage = Column(String(20), nullable=True)
     pipeline_mode = Column(String(10), nullable=True)
     pipeline_waiting = Column(String(20), nullable=True)
+    ai_mode = Column(String(10), default="claude")  # claude, local, hybrid
     last_comment_check_at = Column(String(30), nullable=True)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
@@ -91,6 +92,42 @@ class BackupJob(Base):
     status = Column(String(10), default="ok")  # "ok" or "error"
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow)
+
+
+class DevTask(Base):
+    """SeaClip Lite development roadmap tracker."""
+    __tablename__ = "dev_tasks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    feature = Column(String(255), nullable=False)
+    category = Column(String(50), nullable=False)
+    description = Column(Text, default="")
+    impact = Column(String(10), default="medium")
+    effort = Column(String(10), default="medium")
+    status = Column(String(20), default="planned")
+    priority = Column(Integer, default=50)
+    issue_id = Column(String(36), ForeignKey("issues.id"), nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class ScheduleConfig(Base):
+    """Scheduler config for auto-syncing repos into kanban."""
+    __tablename__ = "schedule_configs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    repo = Column(String(255), nullable=False, unique=True)
+    enabled = Column(Integer, default=0)
+    interval_minutes = Column(Integer, default=15)
+    target_column = Column(String(20), default="backlog")
+    auto_pipeline = Column(Integer, default=0)
+    pipeline_mode = Column(String(10), default="manual")
+    ai_mode = Column(String(10), default="claude")
+    last_synced_at = Column(DateTime, nullable=True)
+    issues_synced = Column(Integer, default=0)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 
 SEED_AGENTS = [

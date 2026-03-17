@@ -4,10 +4,72 @@
 {% block content %}
 <div class="flex items-center justify-between mb-4">
   <h1 class="text-lg font-semibold">Kanban Board</h1>
-  <button onclick="document.getElementById('new-issue-modal').classList.remove('hidden')"
-    class="bg-primary text-white text-[12px] px-3 py-1.5 hover:bg-primary-hover transition-colors">
-    + New Issue
-  </button>
+  <div class="flex gap-2">
+    <button onclick="document.getElementById('scheduler-panel').classList.toggle('hidden')"
+      class="text-text-secondary text-[12px] px-3 py-1.5 border border-border hover:border-primary hover:text-primary transition-colors">
+      Scheduler
+    </button>
+    <button onclick="document.getElementById('new-issue-modal').classList.remove('hidden')"
+      class="bg-primary text-white text-[12px] px-3 py-1.5 hover:bg-primary-hover transition-colors">
+      + New Issue
+    </button>
+  </div>
+</div>
+
+<!-- Scheduler Panel (collapsible) -->
+<div id="scheduler-panel" class="hidden mb-4 bg-surface border border-border p-4">
+  <div class="flex items-center gap-2 mb-3">
+    <span class="text-[12px] font-semibold text-text-primary">Auto-Sync Scheduler</span>
+    <span class="text-[10px] text-text-muted">Pull GitHub issues into kanban on a schedule</span>
+  </div>
+  <form hx-post="/api/scheduler/add" hx-target="#scheduler-list" hx-swap="innerHTML"
+    class="flex items-end gap-2 mb-3 flex-wrap">
+    <div>
+      <label class="text-[10px] text-text-muted block mb-1">Repository</label>
+      <input name="repo" list="kanban-repo-options" placeholder="owner/repo" required
+        class="bg-bg border border-border text-[12px] px-2 py-1.5 text-text-primary outline-none focus:border-primary w-52">
+    </div>
+    <div>
+      <label class="text-[10px] text-text-muted block mb-1">Interval</label>
+      <select name="interval" class="bg-bg border border-border text-[12px] px-2 py-1.5 text-text-primary outline-none w-24">
+        <option value="5">5 min</option>
+        <option value="15" selected>15 min</option>
+        <option value="30">30 min</option>
+        <option value="60">1 hour</option>
+      </select>
+    </div>
+    <div>
+      <label class="text-[10px] text-text-muted block mb-1">Target</label>
+      <select name="target_column" class="bg-bg border border-border text-[12px] px-2 py-1.5 text-text-primary outline-none w-24">
+        <option value="backlog">Backlog</option>
+        <option value="todo">Todo</option>
+      </select>
+    </div>
+    <div>
+      <label class="text-[10px] text-text-muted block mb-1">Auto Pipeline</label>
+      <select name="auto_pipeline" class="bg-bg border border-border text-[12px] px-2 py-1.5 text-text-primary outline-none w-20">
+        <option value="0">Off</option>
+        <option value="1">On</option>
+      </select>
+    </div>
+    <div>
+      <label class="text-[10px] text-text-muted block mb-1">Mode</label>
+      <select name="pipeline_mode" class="bg-bg border border-border text-[12px] px-2 py-1.5 text-text-primary outline-none w-24">
+        <option value="manual">Manual</option>
+        <option value="auto">Auto</option>
+      </select>
+    </div>
+    <div>
+      <label class="text-[10px] text-text-muted block mb-1">AI</label>
+      <select name="ai_mode" class="bg-bg border border-border text-[12px] px-2 py-1.5 text-text-primary outline-none w-24">
+        <option value="claude">Claude</option>
+        <option value="local">Local</option>
+        <option value="hybrid">Hybrid</option>
+      </select>
+    </div>
+    <button type="submit" class="bg-primary text-white text-[11px] px-3 py-1.5 hover:bg-primary-hover">Add</button>
+  </form>
+  <div id="scheduler-list" hx-get="/api/scheduler" hx-trigger="load" hx-swap="innerHTML"></div>
 </div>
 
 <div class="flex gap-4 overflow-x-auto pb-4" style="min-height: 70vh;">
@@ -45,7 +107,13 @@
         <option value="high">High</option>
         <option value="urgent">Urgent</option>
       </select>
-      <input name="github_repo" placeholder="GitHub repo (owner/repo)" class="w-full bg-bg border border-border text-[13px] px-3 py-2 mb-4 text-text-primary outline-none focus:border-primary">
+      <input name="github_repo" list="kanban-repo-options" placeholder="Search or select repo..."
+        class="w-full bg-bg border border-border text-[13px] px-3 py-2 mb-4 text-text-primary outline-none focus:border-primary">
+      <datalist id="kanban-repo-options">
+        {% for repo in repos %}
+        <option value="{{ repo.full_name }}">
+        {% endfor %}
+      </datalist>
       <div class="flex gap-2 justify-end">
         <button type="button" onclick="this.closest('#new-issue-modal').classList.add('hidden')" class="text-[12px] px-3 py-1.5 border border-border text-text-muted hover:text-text-primary">Cancel</button>
         <button type="submit" class="text-[12px] px-3 py-1.5 bg-primary text-white hover:bg-primary-hover">Create</button>

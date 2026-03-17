@@ -23,6 +23,13 @@
   </script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+  <script>
+    if (window.marked) {
+      marked.setOptions({ breaks: true, gfm: true });
+    }
+  </script>
   <style>
     body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
     ::-webkit-scrollbar { width: 6px; }
@@ -35,6 +42,24 @@
     .htmx-request .htmx-indicator { opacity: 1; }
     @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+    .md-body h1, .md-body h2, .md-body h3 { color: #e6edf3; font-weight: 600; margin: 0.75em 0 0.4em; }
+    .md-body h1 { font-size: 1.2em; }
+    .md-body h2 { font-size: 1.05em; border-bottom: 1px solid #30363d; padding-bottom: 4px; }
+    .md-body h3 { font-size: 0.95em; }
+    .md-body p { margin: 0 0 6px; }
+    .md-body code { background: #161b22; color: #79c0ff; padding: 1px 5px; border-radius: 4px; font-family: 'SF Mono', Consolas, monospace; font-size: 0.9em; }
+    .md-body pre { background: #161b22; border: 1px solid #30363d; padding: 12px; overflow-x: auto; border-radius: 4px; margin: 6px 0; }
+    .md-body pre code { background: none; color: #e6edf3; padding: 0; font-size: 11px; }
+    .md-body table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 6px 0; }
+    .md-body th, .md-body td { border: 1px solid #30363d; padding: 6px 10px; }
+    .md-body th { background: #161b22; color: #8b949e; text-align: left; }
+    .md-body ul { padding-left: 1.25rem; list-style: disc; margin: 4px 0; }
+    .md-body ol { padding-left: 1.25rem; list-style: decimal; margin: 4px 0; }
+    .md-body li { margin: 2px 0; }
+    .md-body blockquote { border-left: 3px solid #30363d; padding-left: 12px; color: #8b949e; margin: 6px 0; }
+    .md-body a { color: #2f81f7; text-decoration: none; }
+    .md-body a:hover { color: #388bfd; text-decoration: underline; }
+    .md-body hr { border: none; border-top: 1px solid #30363d; margin: 8px 0; }
   </style>
 </head>
 <body class="min-h-screen flex">
@@ -45,7 +70,12 @@
     <a href="/kanban" class="sidebar-link {% if active == 'kanban' %}bg-surface text-primary{% else %}text-text-secondary hover:text-text-primary hover:bg-surface/50{% endif %} px-3 py-2 text-[13px] mb-1 transition-colors">Kanban</a>
     <a href="/identify" class="sidebar-link {% if active == 'identify' %}bg-surface text-primary{% else %}text-text-secondary hover:text-text-primary hover:bg-surface/50{% endif %} px-3 py-2 text-[13px] mb-1 transition-colors">Identify</a>
     <a href="/agents" class="sidebar-link {% if active == 'agents' %}bg-surface text-primary{% else %}text-text-secondary hover:text-text-primary hover:bg-surface/50{% endif %} px-3 py-2 text-[13px] mb-1 transition-colors">Agents</a>
+    <a href="/roadmap" class="sidebar-link {% if active == 'roadmap' %}bg-surface text-primary{% else %}text-text-secondary hover:text-text-primary hover:bg-surface/50{% endif %} px-3 py-2 text-[13px] mb-1 transition-colors">Roadmap</a>
     <a href="/backup" class="sidebar-link {% if active == 'backup' %}bg-surface text-primary{% else %}text-text-secondary hover:text-text-primary hover:bg-surface/50{% endif %} px-3 py-2 text-[13px] mb-1 transition-colors">Backup</a>
+    <div class="border-t border-border mt-4 pt-3 mb-1">
+      <span class="text-[10px] font-semibold uppercase tracking-wider text-text-muted px-3">Resources</span>
+    </div>
+    <a href="http://localhost:9090/docs" target="_blank" class="sidebar-link text-text-secondary hover:text-text-primary hover:bg-surface/50 px-3 py-2 text-[13px] mb-1 transition-colors flex items-center gap-2">Docs <span class="text-[9px] text-text-muted">↗</span></a>
     <div class="mt-auto text-[10px] text-text-muted px-2">Port 5200 · FastAPI + HTMX</div>
   </nav>
 
