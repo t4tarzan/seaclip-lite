@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from .config import settings
 from .database import init_db, async_session
-from .models import Agent, SEED_AGENTS
+from .models import Agent, BackupJob, SEED_AGENTS  # noqa: F401 — BackupJob must be imported before init_db()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,17 +39,31 @@ async def lifespan(app: FastAPI):
     await init_db()
     await seed_agents()
 
+    # Ensure backup directory exists
+    from .services.backup import _ensure_backup_dir
+    _ensure_backup_dir()
+
     # Start GitHub poller
     from .services.poller import start_poller
     poller_task = asyncio.create_task(start_poller())
+
+    # Start backup scheduler
+    from .services.backup import start_backup_scheduler
+    backup_task = start_backup_scheduler()
+
     logger.info("SeaClip Lite started on port %d", settings.port)
 
     yield
 
     # Shutdown
     poller_task.cancel()
+    backup_task.cancel()
     try:
         await poller_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await backup_task
     except asyncio.CancelledError:
         pass
 
@@ -66,7 +80,7 @@ if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Routers
-from .routers import pages, issues, identify, pipeline, agents, github  # noqa: E402
+from .routers import pages, issues, identify, pipeline, agents, github, backup  # noqa: E402
 
 app.include_router(pages.router)
 app.include_router(issues.router)
@@ -74,6 +88,7 @@ app.include_router(identify.router)
 app.include_router(pipeline.router)
 app.include_router(agents.router)
 app.include_router(github.router)
+app.include_router(backup.router)
 
 
 @app.get("/health")

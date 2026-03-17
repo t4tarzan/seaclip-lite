@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import settings
 from ..database import get_db
 from ..models import Issue, Agent, ImportedComment
 
@@ -61,6 +62,19 @@ async def agents_page(request: Request, db: AsyncSession = Depends(get_db)):
     return request.app.state.templates.TemplateResponse("pages/agents.html", {
         "request": request,
         "agents": agents,
+    })
+
+
+@router.get("/backup")
+async def backup_page(request: Request, db: AsyncSession = Depends(get_db)):
+    from ..services.backup import list_backups
+    backups = await list_backups(db)
+    last_backup = backups[0] if backups else None
+    return request.app.state.templates.TemplateResponse("pages/backup.html", {
+        "request": request,
+        "backups": backups,
+        "last_backup": last_backup,
+        "backup_dir": settings.backup_dir,
     })
 
 
