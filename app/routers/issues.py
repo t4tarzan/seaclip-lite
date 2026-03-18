@@ -61,6 +61,26 @@ async def move_issue(
     return HTMLResponse(status_code=200)
 
 
+@router.post("/{issue_id}/status")
+async def update_issue_status(
+    request: Request,
+    issue_id: str,
+    status: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    issue = await db.get(Issue, issue_id)
+    if not issue:
+        return HTMLResponse("Not found", status_code=404)
+
+    issue.status = status
+    issue.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(issue)
+    return request.app.state.templates.TemplateResponse("partials/kanban_card.html", {
+        "request": request, "issue": issue,
+    })
+
+
 @router.delete("/{issue_id}")
 async def delete_issue(issue_id: str, db: AsyncSession = Depends(get_db)):
     issue = await db.get(Issue, issue_id)

@@ -72,22 +72,27 @@
   <div id="scheduler-list" hx-get="/api/scheduler" hx-trigger="load" hx-swap="innerHTML"></div>
 </div>
 
+<style>
+  .sortable-ghost { opacity: 0.35; background: rgba(47,129,247,0.08); border: 1px dashed #2f81f7 !important; }
+  .sortable-chosen { box-shadow: 0 4px 20px rgba(0,0,0,0.5); border-color: #2f81f7 !important; }
+  .drop-zone.drag-over { border-color: rgba(47,129,247,0.5) !important; background: rgba(47,129,247,0.05); }
+</style>
+
 <div class="flex gap-4 overflow-x-auto pb-4" style="min-height: 70vh;">
   {% for status, label in [('backlog','Backlog'),('todo','Todo'),('in_progress','In Progress'),('in_review','In Review'),('done','Done')] %}
-  <div class="flex flex-col flex-1 min-w-[200px]"
-       ondragover="event.preventDefault(); this.querySelector('.drop-zone').classList.add('border-primary/40','bg-primary/5')"
-       ondragleave="this.querySelector('.drop-zone').classList.remove('border-primary/40','bg-primary/5')"
-       ondrop="handleDrop(event, '{{ status }}')">
+  <div class="flex flex-col flex-1 min-w-[200px]">
     <div class="flex items-center gap-2 mb-3 px-1">
       <span class="text-[12px] font-semibold text-text-primary">{{ label }}</span>
-      <span class="ml-auto text-[10px] font-mono text-text-muted bg-bg-alt px-1.5 py-0.5">{{ columns[status]|length }}</span>
+      <span class="ml-auto text-[10px] font-mono text-text-muted bg-bg-alt px-1.5 py-0.5" id="count-{{ status }}">{{ columns[status]|length }}</span>
     </div>
-    <div class="drop-zone flex-1 min-h-[120px] bg-bg-alt/30 p-2 space-y-2 border border-transparent transition-colors" id="col-{{ status }}">
+    <div class="drop-zone flex-1 min-h-[120px] bg-bg-alt/30 p-2 space-y-2 border border-transparent transition-colors"
+         id="col-{{ status }}"
+         data-status="{{ status }}">
       {% for issue in columns[status] %}
         {% include "partials/kanban_card.html" %}
       {% endfor %}
       {% if not columns[status] %}
-      <p class="text-[11px] text-border-hover text-center pt-10">No issues</p>
+      <p class="text-[11px] text-border-hover text-center pt-10 empty-placeholder">No issues</p>
       {% endif %}
     </div>
   </div>
@@ -122,15 +127,51 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 <script>
-function handleDrop(e, status) {
-  e.preventDefault();
-  const issueId = e.dataTransfer.getData('text/plain');
-  if (!issueId) return;
-  const form = new FormData();
-  form.append('status', status);
-  fetch(`/api/issues/${issueId}/move`, { method: 'POST', body: form })
-    .then(() => location.reload());
+function syncColumnCount(col) {
+  const status = col.dataset.status;
+  const cards = col.querySelectorAll('[data-id]');
+  const countEl = document.getElementById('count-' + status);
+  if (countEl) countEl.textContent = cards.length;
+  let placeholder = col.querySelector('.empty-placeholder');
+  if (cards.length === 0) {
+    if (!placeholder) {
+      placeholder = document.createElement('p');
+      placeholder.className = 'text-[11px] text-border-hover text-center pt-10 empty-placeholder';
+      placeholder.textContent = 'No issues';
+      col.appendChild(placeholder);
+    }
+  } else {
+    if (placeholder) placeholder.remove();
+  }
 }
+
+document.querySelectorAll('.drop-zone').forEach(function(col) {
+  Sortable.create(col, {
+    group: 'kanban',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onAdd: function(evt) { syncColumnCount(evt.to); syncColumnCount(evt.from); },
+    onEnd: function(evt) {
+      const issueId = evt.item.dataset.id;
+      const newStatus = evt.to.dataset.status;
+      const oldStatus = evt.from.dataset.status;
+      if (!issueId || newStatus === oldStatus) return;
+      htmx.ajax('POST', '/api/issues/' + issueId + '/status', {
+        values: { status: newStatus },
+        target: evt.item,
+        swap: 'outerHTML'
+      });
+    }
+  });
+
+  col.addEventListener('dragenter', function() { col.classList.add('drag-over'); });
+  col.addEventListener('dragleave', function(e) {
+    if (!col.contains(e.relatedTarget)) col.classList.remove('drag-over');
+  });
+  col.addEventListener('drop', function() { col.classList.remove('drag-over'); });
+});
 </script>
 {% endblock %}

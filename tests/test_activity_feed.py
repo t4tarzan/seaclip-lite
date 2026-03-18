@@ -232,6 +232,30 @@ def test_activity_feed_icon_for_sync(templates_dir):
     assert "text-warning" in content
 
 
+# ── Clickable links to related issues ───────────────────────────────────────────
+
+def test_activity_feed_entries_link_to_issue(templates_dir):
+    """Partial must wrap entries with issue_id in an <a> tag pointing to /issues/{issue_id}."""
+    content = (templates_dir / "partials" / "activity_feed.html").read_text()
+    assert "a.issue_id" in content
+    assert "/issues/" in content
+    assert "<a " in content
+
+
+def test_activity_feed_link_uses_href(templates_dir):
+    """The anchor tag must have an href attribute with the issue URL."""
+    content = (templates_dir / "partials" / "activity_feed.html").read_text()
+    assert 'href="/issues/' in content
+
+
+def test_activity_feed_non_issue_entries_not_linked(templates_dir):
+    """Entries without issue_id must fall back to a plain div (not an anchor)."""
+    content = (templates_dir / "partials" / "activity_feed.html").read_text()
+    # Template must have an else branch that uses <div> for non-issue entries
+    assert "{% else %}" in content
+    assert "<div" in content
+
+
 # ── /api/activity route exists in router ────────────────────────────────────────
 
 def test_api_activity_route_registered():
