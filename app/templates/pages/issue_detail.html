@@ -28,8 +28,11 @@
       class="text-[11px] text-error border border-error/30 px-3 py-1 hover:bg-error/10 transition-colors">Delete Issue</button>
   </div>
 
-  <!-- Right: Pipeline panel -->
-  <div class="w-80 shrink-0" id="pipeline-panel" hx-get="/api/pipeline/{{ issue.id }}/status" hx-trigger="every 10s">
+  <!-- Right: Pipeline column (stepper + controls), refreshes every 10s -->
+  <div class="w-80 shrink-0 flex flex-col gap-0" id="pipeline-panel"
+       hx-get="/api/pipeline/{{ issue.id }}/panel"
+       hx-trigger="every 10s"
+       hx-swap="innerHTML">
     {% include "partials/pipeline_panel.html" %}
   </div>
 </div>

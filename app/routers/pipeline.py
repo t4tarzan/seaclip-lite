@@ -95,6 +95,20 @@ async def stop(
     })
 
 
+@router.get("/{issue_id}/panel")
+async def panel_partial(
+    request: Request,
+    issue_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    issue = await db.get(Issue, issue_id)
+    if not issue:
+        return HTMLResponse("", status_code=404)
+    return request.app.state.templates.TemplateResponse("partials/pipeline_panel.html", {
+        "request": request, "issue": issue, "stage_agent_name": STAGE_AGENT_NAME,
+    })
+
+
 @router.get("/{issue_id}/status")
 async def status(issue_id: str, db: AsyncSession = Depends(get_db)):
     issue = await db.get(Issue, issue_id)
