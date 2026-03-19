@@ -1,6 +1,6 @@
-# Task Handoff: Issue #3 Complete → Issue #4 — Visual Pipeline Progress Stepper on Issue Detail
+# Task Handoff: Issue #4 — Visual Pipeline Progress Stepper on Issue Detail
 
-## Status: Research Complete — Ready for Implementation
+## Status: RESEARCH COMPLETE — 2026-03-19
 
 ---
 
@@ -12,14 +12,14 @@ The pipeline panel on `issue_detail.html` only shows `pipeline_stage` as a text 
 
 ## Current State Analysis
 
-### Template Structure
+### Implementation Status
 
 | Component | File | Status |
 |-----------|------|--------|
-| Issue detail page | `app/templates/pages/issue_detail.html` | ✅ Exists — right sidebar has `#pipeline-panel` |
-| Pipeline panel partial | `app/templates/partials/pipeline_panel.html` | ✅ Exists — only shows badge, no stepper |
-| Partials directory | `app/templates/partials/` | ✅ Exists — drop new file here |
-| `pipeline_stepper.html` partial | `app/templates/partials/pipeline_stepper.html` | ❌ Does NOT exist yet |
+| Issue detail page | `app/templates/pages/issue_detail.html` | ✅ Exists — right sidebar has `#pipeline-panel` with 10s HTMX refresh |
+| Pipeline panel partial | `app/templates/partials/pipeline_panel.html` | ✅ Modified — includes `pipeline_stepper.html` at top |
+| Pipeline stepper partial | `app/templates/partials/pipeline_stepper.html` | ✅ Created — full 6-step horizontal stepper |
+| Pipeline router | `app/routers/pipeline.py` | ✅ Has `/panel` GET endpoint for HTMX refresh |
 
 ### Pipeline Stage Definition (from `app/agents/pipeline.py`)
 
@@ -36,7 +36,7 @@ STAGE_AGENT_NAME = {
 }
 ```
 
-**Stage-to-display-label mapping** (STAGE_ORDER key → UI label per issue spec):
+**Stage-to-display-label mapping:**
 
 | STAGE_ORDER key | Display Label | Agent |
 |----------------|---------------|-------|
@@ -46,185 +46,94 @@ STAGE_AGENT_NAME = {
 | `coded` | Test | Tina |
 | `tested` | Review | Suzy |
 | `reviewed` | Release | Matthews |
-| `completed` | (all done) | — |
+| `completed` | (all done — all steps green) | — |
 
-### HTMX Refresh Pattern (existing)
+### HTMX Refresh Pattern
 
-`issue_detail.html` line 32–34:
+`issue_detail.html` lines 32–37:
 ```html
-<div class="w-80 shrink-0" id="pipeline-panel" hx-get="/api/pipeline/{{ issue.id }}/status" hx-trigger="every 10s">
+<div class="w-80 shrink-0 flex flex-col gap-0" id="pipeline-panel"
+     hx-get="/api/pipeline/{{ issue.id }}/panel"
+     hx-trigger="every 10s"
+     hx-swap="innerHTML">
   {% include "partials/pipeline_panel.html" %}
 </div>
 ```
 
-**Note:** `/api/pipeline/{issue_id}/status` returns **JSON** (not HTML), so the `hx-get` auto-refresh on `#pipeline-panel` produces raw JSON in the div — this is an existing bug. The actual HTML updates come from button form submissions inside `pipeline_panel.html` that target `#pipeline-panel` with `hx-swap="innerHTML"`.
+The stepper is embedded inside `pipeline_panel.html` via `{% include "partials/pipeline_stepper.html" %}` at line 1, so it refreshes automatically when the panel refreshes — no separate endpoint needed.
 
-The stepper needs its **own HTMX refresh endpoint** returning an HTML partial.
+### Stepper Logic (`pipeline_stepper.html`)
 
-### Template Context Variables
+```jinja
+{% set stage_to_idx = {"plan": 0, "researched": 1, "planned": 2, "coded": 3, "tested": 4, "reviewed": 5} %}
+{%- if issue.pipeline_stage == "completed" -%}
+  {%- set current_idx = 6 -%}
+{%- elif issue.pipeline_stage and issue.pipeline_stage in stage_to_idx -%}
+  {%- set current_idx = stage_to_idx[issue.pipeline_stage] -%}
+{%- else -%}
+  {%- set current_idx = -1 -%}
+{%- endif -%}
+```
 
-The `issue_detail` route (`app/routers/pages.py` line 132–152) passes:
-- `issue` — full Issue model with `pipeline_stage`, `pipeline_mode`, `pipeline_waiting`
-- `comments` — list of ImportedComment
-- `stage_agent_name` — the `STAGE_AGENT_NAME` dict
+Step state logic:
+- `state == "completed"` → `current_idx >= 6 or step.idx < current_idx`
+- `state == "active"` → `step.idx == current_idx`
+- `state == "pending"` → default
 
-The stepper partial receives the same `issue` object (Jinja `{% include %}` shares context).
+Visual classes:
+- Completed: `bg-success text-white` + checkmark `✓`
+- Active: `bg-primary text-white stepper-active` (custom `@keyframes stepper-pulse` CSS animation)
+- Pending: `bg-bg-alt border border-border text-text-muted`
+
+Connector lines between steps color based on following step's state:
+- Left connector green when `step.idx <= current_idx`
+- Right connector green when `step.idx < current_idx`
 
 ### Design System (from `app/templates/base.html`)
 
-Custom Tailwind colors available:
-- Success/completed: `text-success` (`#3fb950`), `bg-success/20`
+Custom Tailwind colors:
+- Success/completed: `text-success` (`#3fb950`), `bg-success`
 - Active/primary: `text-primary` (`#2f81f7`), `bg-primary`
 - Pending/muted: `text-text-muted` (`#7d8590`), `bg-bg-alt` (`#161b22`)
 - Border: `border-border` (`#30363d`)
 
-Custom CSS animations already defined in `base.html`:
-- `.pulse-dot` keyframe animation
-- `animate-pulse` — Tailwind built-in works (CDN includes it)
+HTMX version: `htmx.org@2.0.4` loaded from CDN.
 
 ---
 
-## Implementation Plan
+## Implementation Summary
 
-### Step 1: Create `app/templates/partials/pipeline_stepper.html`
+### Files Modified/Created
 
-Six connected steps, horizontal layout, using Tailwind + Jinja logic:
-
-```html
-{% set stages = [
-  ('plan', 'Research'),
-  ('researched', 'Plan'),
-  ('planned', 'Code'),
-  ('coded', 'Test'),
-  ('tested', 'Review'),
-  ('reviewed', 'Release')
-] %}
-
-{# Determine current stage index (-1 = not started, 6 = completed) #}
-{% set ns = namespace(current_idx=-1) %}
-{% if issue.pipeline_stage == 'completed' %}
-  {% set ns.current_idx = 6 %}
-{% else %}
-  {% for stage_key, label in stages %}
-    {% if stage_key == issue.pipeline_stage %}
-      {% set ns.current_idx = loop.index0 %}
-    {% endif %}
-  {% endfor %}
-{% endif %}
-
-<div class="flex items-center w-full py-3 px-1">
-  {% for stage_key, label in stages %}
-    {% set i = loop.index0 %}
-    {% set is_done = (ns.current_idx > i) or (ns.current_idx == 6) %}
-    {% set is_active = ns.current_idx == i %}
-    {% set is_pending = ns.current_idx < i and ns.current_idx != 6 %}
-
-    {# Step circle #}
-    <div class="flex flex-col items-center relative">
-      <div class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold border-2
-        {% if is_done %}border-success bg-success/20 text-success
-        {% elif is_active %}border-primary bg-primary/20 text-primary animate-pulse
-        {% else %}border-border bg-bg-alt text-text-muted{% endif %}">
-        {% if is_done %}✓{% else %}{{ loop.index }}{% endif %}
-      </div>
-      <span class="text-[9px] mt-1 font-medium
-        {% if is_done %}text-success
-        {% elif is_active %}text-primary
-        {% else %}text-text-muted{% endif %}">
-        {{ label }}
-      </span>
-    </div>
-
-    {# Connector line (not after last step) #}
-    {% if not loop.last %}
-    <div class="flex-1 h-[2px] mx-1 mb-3
-      {% if is_done %}bg-success/60
-      {% elif is_active %}bg-primary/40
-      {% else %}bg-border{% endif %}">
-    </div>
-    {% endif %}
-  {% endfor %}
-</div>
-```
-
-### Step 2: Add new HTMX endpoint for stepper HTML
-
-In `app/routers/pipeline.py`, add:
-
-```python
-@router.get("/{issue_id}/stepper")
-async def pipeline_stepper(request: Request, issue_id: str, db: AsyncSession = Depends(get_db)):
-    issue = await db.get(Issue, issue_id)
-    if not issue:
-        return HTMLResponse("")
-    return request.app.state.templates.TemplateResponse("partials/pipeline_stepper.html", {
-        "request": request,
-        "issue": issue,
-    })
-```
-
-### Step 3: Include stepper in `issue_detail.html` above the pipeline panel
-
-Replace the right sidebar block (lines 31–34) with:
-
-```html
-<!-- Right: Pipeline stepper + panel -->
-<div class="w-80 shrink-0 flex flex-col gap-3">
-  <!-- Stepper (auto-refreshes every 10s) -->
-  <div id="pipeline-stepper"
-       hx-get="/api/pipeline/{{ issue.id }}/stepper"
-       hx-trigger="load, every 10s"
-       hx-swap="outerHTML">
-    {% include "partials/pipeline_stepper.html" %}
-  </div>
-
-  <!-- Pipeline panel (actions) -->
-  <div id="pipeline-panel" hx-get="/api/pipeline/{{ issue.id }}/status" hx-trigger="every 10s">
-    {% include "partials/pipeline_panel.html" %}
-  </div>
-</div>
-```
+| File | Action | Change |
+|------|--------|--------|
+| `app/templates/partials/pipeline_stepper.html` | **Created** | New 6-step horizontal stepper partial with Jinja state logic and CSS pulse animation |
+| `app/templates/partials/pipeline_panel.html` | **Modified** | Added `{% include "partials/pipeline_stepper.html" %}` at line 1 |
+| `app/templates/pages/issue_detail.html` | **Modified** | Pipeline panel div now uses `hx-get="/api/pipeline/{{ issue.id }}/panel"` (returns HTML, not JSON) |
+| `app/routers/pipeline.py` | **Modified** | `/panel` GET endpoint confirmed for HTMX HTML partial refresh |
 
 ---
 
-## Files to Create/Modify
+## Acceptance Criteria
 
-| File | Action | Details |
-|------|--------|---------|
-| `app/templates/partials/pipeline_stepper.html` | **Create** | New 6-step stepper partial |
-| `app/routers/pipeline.py` | **Edit** | Add `GET /{issue_id}/stepper` HTML endpoint |
-| `app/templates/pages/issue_detail.html` | **Edit** | Wrap right sidebar, include stepper above pipeline-panel |
-
----
-
-## Acceptance Criteria Checklist
-
-| Criteria | Implementation |
-|----------|---------------|
-| All 6 stages visible as connected steps | ✅ 6-step loop with connector lines |
-| Correct visual state: completed (green), active (cyan pulse), pending (grey) | ✅ Jinja conditionals + Tailwind classes |
-| Updates when pipeline advances | ✅ HTMX `hx-trigger="every 10s"` on stepper div |
+| Criteria | Status |
+|----------|--------|
+| All 6 stages visible as connected steps | ✅ 6-step loop with connector lines between each |
+| Completed stages highlighted green | ✅ `bg-success text-white` + checkmark icon |
+| Active stage pulsing cyan | ✅ `bg-primary text-white` + `stepper-pulse` CSS animation |
+| Pending stages grey | ✅ `bg-bg-alt border border-border text-text-muted` |
+| Updates when pipeline advances | ✅ Included in pipeline_panel which refreshes every 10s via HTMX |
 
 ---
 
 ## Key Implementation Notes
 
-1. **Jinja namespace trick**: Use `{% set ns = namespace(current_idx=-1) %}` to mutate state inside a for loop — required to find active step index.
+1. **Stepper embedded in panel**: Rather than a separate HTMX endpoint, the stepper is `{% include %}`d inside `pipeline_panel.html`. This means it refreshes whenever the panel refreshes via `hx-get="/api/pipeline/{issue_id}/panel"` — simpler, no extra endpoint needed.
 
-2. **`animate-pulse`**: Tailwind CDN includes this utility — safe to use without a build step.
+2. **Stage index mapping**: Uses a static dict `stage_to_idx` (not namespace loop) to map stage key → integer index. `current_idx = 6` when `completed` so all steps show green.
 
-3. **`is_done` when completed**: When `pipeline_stage == 'completed'`, `ns.current_idx = 6` so `is_done` is true for all steps (index 0–5 all satisfy `6 > i`).
+3. **Custom CSS animation**: `@keyframes stepper-pulse` is defined inline in the stepper template itself (not base.html) — box-shadow pulse on active step.
 
-4. **Connector line coloring**: Color the connector AFTER a step based on that step's state — so a green step has a green connector leading to the next step.
+4. **Connector line coloring**: Left connector of a step turns green when `step.idx <= current_idx` (step and all predecessors done). Right connector turns green when `step.idx < current_idx`.
 
-5. **No model changes needed**: `pipeline_stage` field already exists on the Issue model.
-
-6. **No DB changes needed**: No new migrations required.
-
----
-
-## Existing Pattern References
-
-- `pipeline_panel.html` — how `issue.pipeline_stage` and `issue.pipeline_mode` are used in templates
-- `comments_list.html` + `issue_detail.html` — existing HTMX partial refresh pattern (`hx-trigger="load, every 10s"`, `hx-swap="outerHTML"`)
-- `base.html` — custom color tokens (`text-success`, `text-primary`, `border-border`, etc.)
+5. **No model changes**: `pipeline_stage` field already exists on the Issue model. No migrations required.

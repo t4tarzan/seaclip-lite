@@ -1,0 +1,63 @@
+{% set steps = [
+  {"key": "plan",       "label": "Research", "idx": 0},
+  {"key": "researched", "label": "Plan",     "idx": 1},
+  {"key": "planned",    "label": "Code",     "idx": 2},
+  {"key": "coded",      "label": "Test",     "idx": 3},
+  {"key": "tested",     "label": "Review",   "idx": 4},
+  {"key": "reviewed",   "label": "Release",  "idx": 5}
+] %}
+{%- set stage_to_idx = {"plan": 0, "researched": 1, "planned": 2, "coded": 3, "tested": 4, "reviewed": 5} -%}
+{%- if issue.pipeline_stage == "completed" -%}
+  {%- set current_idx = 6 -%}
+{%- elif issue.pipeline_stage and issue.pipeline_stage in stage_to_idx -%}
+  {%- set current_idx = stage_to_idx[issue.pipeline_stage] -%}
+{%- else -%}
+  {%- set current_idx = -1 -%}
+{%- endif -%}
+
+<style>
+  @keyframes stepper-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(47, 129, 247, 0.6); }
+    60%       { box-shadow: 0 0 0 5px rgba(47, 129, 247, 0); }
+  }
+  .stepper-active { animation: stepper-pulse 1.6s ease-in-out infinite; }
+</style>
+
+<div class="bg-surface border border-border px-4 py-3">
+  <p class="text-[10px] font-semibold uppercase tracking-wider text-text-secondary mb-3">Pipeline Progress</p>
+  <div class="flex items-start">
+    {% for step in steps %}
+    {%- set state = "completed" if (current_idx >= 6 or step.idx < current_idx) else ("active" if step.idx == current_idx else "pending") -%}
+    <div class="flex-1 flex flex-col items-center">
+
+      <div class="flex items-center w-full">
+        {# Left connector: green when this step's predecessor is completed, i.e. step.idx <= current_idx #}
+        {% if not loop.first %}
+        <div class="flex-1 h-px {{ 'bg-success' if step.idx <= current_idx else 'bg-border' }}"></div>
+        {% endif %}
+
+        {# Step circle #}
+        <div class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold
+          {% if state == 'completed' %}bg-success text-white
+          {% elif state == 'active' %}bg-primary text-white stepper-active
+          {% else %}bg-bg-alt border border-border text-text-muted{% endif %}">
+          {% if state == 'completed' %}✓{% else %}{{ loop.index }}{% endif %}
+        </div>
+
+        {# Right connector: green when this step is already completed, i.e. step.idx < current_idx #}
+        {% if not loop.last %}
+        <div class="flex-1 h-px {{ 'bg-success' if step.idx < current_idx else 'bg-border' }}"></div>
+        {% endif %}
+      </div>
+
+      <span class="text-[9px] mt-1 text-center leading-tight
+        {% if state == 'active' %}text-primary font-semibold
+        {% elif state == 'completed' %}text-success
+        {% else %}text-text-muted{% endif %}">
+        {{ step.label }}
+      </span>
+
+    </div>
+    {% endfor %}
+  </div>
+</div>
