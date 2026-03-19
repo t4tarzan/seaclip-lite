@@ -1,0 +1,62 @@
+<form hx-put="/api/issues/{{ issue.id }}"
+      hx-target="#issue-header"
+      hx-swap="innerHTML"
+      class="space-y-4">
+
+  <div class="flex items-center gap-3 mb-4">
+    <span class="text-[12px] text-text-muted font-semibold uppercase tracking-wider">Editing Issue</span>
+    <button type="button"
+            hx-get="/api/issues/{{ issue.id }}/header"
+            hx-target="#issue-header"
+            hx-swap="innerHTML"
+            class="ml-auto text-[11px] text-text-muted border border-border px-3 py-1 hover:bg-surface transition-colors">
+      Cancel
+    </button>
+    <button type="submit"
+            class="text-[11px] text-bg bg-primary border border-primary px-3 py-1 hover:bg-primary-hover transition-colors">
+      Save
+    </button>
+  </div>
+
+  <div>
+    <label class="block text-[11px] text-text-muted mb-1 uppercase tracking-wider">Title</label>
+    <input type="text" name="title" value="{{ issue.title }}" required
+           class="w-full bg-surface border border-border text-text-primary text-[13px] px-3 py-2 focus:outline-none focus:border-primary">
+  </div>
+
+  <div>
+    <label class="block text-[11px] text-text-muted mb-1 uppercase tracking-wider">Description</label>
+    <textarea name="description" rows="4"
+              class="w-full bg-surface border border-border text-text-primary text-[13px] px-3 py-2 focus:outline-none focus:border-primary resize-none">{{ issue.description or '' }}</textarea>
+  </div>
+
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block text-[11px] text-text-muted mb-1 uppercase tracking-wider">Priority</label>
+      <select name="priority"
+              class="w-full bg-surface border border-border text-text-primary text-[13px] px-3 py-2 focus:outline-none focus:border-primary">
+        {% for p in ['low', 'medium', 'high', 'urgent'] %}
+        <option value="{{ p }}" {% if issue.priority == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-[11px] text-text-muted mb-1 uppercase tracking-wider">Status</label>
+      <select name="status"
+              class="w-full bg-surface border border-border text-text-primary text-[13px] px-3 py-2 focus:outline-none focus:border-primary">
+        {% for s in ['backlog', 'todo', 'in_progress', 'in_review', 'done'] %}
+        <option value="{{ s }}" {% if issue.status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-[11px] text-text-muted mb-1 uppercase tracking-wider">GitHub Repo <span class="normal-case">(owner/repo)</span></label>
+    <input type="text" name="github_repo" value="{{ issue.github_repo or '' }}"
+           placeholder="e.g. octocat/hello-world"
+           class="w-full bg-surface border border-border text-text-primary text-[13px] px-3 py-2 focus:outline-none focus:border-primary">
+  </div>
+
+</form>

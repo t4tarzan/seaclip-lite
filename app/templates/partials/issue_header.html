@@ -1,0 +1,20 @@
+<div class="flex items-center gap-3 mb-4">
+  <a href="/kanban" class="text-[12px] text-text-muted hover:text-primary">&larr; Back</a>
+  <span class="badge bg-{{ 'error/20 text-error' if issue.priority == 'urgent' else 'warning/20 text-warning' if issue.priority == 'high' else 'primary/20 text-primary' if issue.priority == 'medium' else 'text-muted/20 text-text-muted' }}">{{ issue.priority }}</span>
+  <span class="badge bg-bg-alt text-text-muted">{{ issue.status }}</span>
+  <button hx-get="/api/issues/{{ issue.id }}/edit"
+          hx-target="#issue-header"
+          hx-swap="innerHTML"
+          class="ml-auto text-[11px] text-primary border border-primary/30 px-3 py-1 hover:bg-primary/10 transition-colors">
+    Edit
+  </button>
+</div>
+
+<h1 class="text-lg font-semibold mb-1">{{ issue.title }}</h1>
+{% if issue.github_repo %}
+<div class="text-[12px] text-text-muted mb-3">{{ issue.github_repo }}</div>
+{% endif %}
+
+{% if issue.description %}
+<div class="bg-surface border border-border p-4 mb-6 text-[13px] text-text-secondary whitespace-pre-wrap leading-relaxed">{{ issue.description }}</div>
+{% endif %}
