@@ -70,6 +70,19 @@ async def create_issue(repo: str, title: str, body: str) -> dict:
     return {"number": data["number"], "url": data["html_url"]}
 
 
+async def post_comment(repo: str, issue_number: int, body: str) -> dict:
+    """Post a comment on a GitHub issue."""
+    client = await get_client()
+    r = await client.post(
+        f"/repos/{repo}/issues/{issue_number}/comments",
+        json={"body": body},
+    )
+    if r.status_code not in (200, 201):
+        raise Exception(f"GitHub post comment failed ({r.status_code}): {r.text}")
+    data = r.json()
+    return {"id": data.get("id", 0)}
+
+
 async def add_label(repo: str, issue_number: int, label: str) -> None:
     client = await get_client()
     await client.post(f"/repos/{repo}/issues/{issue_number}/labels", json={"labels": [label]})
