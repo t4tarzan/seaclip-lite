@@ -130,6 +130,61 @@ class ScheduleConfig(Base):
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 
+class HubSettings(Base):
+    """Key-value settings for the hub."""
+    __tablename__ = "hub_settings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String(100), nullable=False, unique=True)
+    value = Column(Text, default="")
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class TokenUsage(Base):
+    """Cost and token tracking per agent/issue."""
+    __tablename__ = "token_usage"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agent_id = Column(String(36), ForeignKey("agents.id"), nullable=True)
+    issue_id = Column(String(36), ForeignKey("issues.id"), nullable=True)
+    model = Column(String(100), default="")
+    provider = Column(String(50), default="")  # claude, ollama
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    cost_usd = Column(String(20), default="0.00")
+    created_at = Column(DateTime, default=utcnow)
+
+
+class AgentSoul(Base):
+    """Custom personality/instructions per agent role."""
+    __tablename__ = "agent_souls"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agent_role = Column(String(50), nullable=False, unique=True)
+    system_prompt = Column(Text, default="")
+    extra_instructions = Column(Text, default="")
+    temperature = Column(String(10), default="0.7")
+    provider = Column(String(50), default="")   # e.g. "openai", "" = use global default
+    model = Column(String(100), default="")     # e.g. "gpt-4o", "" = use global default
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class IssueTemplate(Base):
+    """Pre-defined issue templates for quick creation."""
+    __tablename__ = "issue_templates"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+    title_template = Column(String(255), default="")
+    description_template = Column(Text, default="")
+    priority = Column(String(20), default="medium")
+    labels = Column(String(500), default="")
+    category = Column(String(50), default="general")
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+
+
 SEED_AGENTS = [
     {"name": "Curious Charlie", "role": "research"},
     {"name": "Peter Plan", "role": "architect"},

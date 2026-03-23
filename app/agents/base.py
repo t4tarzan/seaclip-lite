@@ -8,10 +8,41 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models import Agent, Issue, ActivityLog, ImportedComment
 from ..services import ai, github
 from ..services.events import event_bus
+from ..services.model_config import resolve_model_config
 
 logger = logging.getLogger("seaclip.agents")
 
 # Maps each agent to the next agent name for handoff messages
+# CLI-Anything tools available to each agent role
+# Activate with: source /Users/whitenoise-oc/projects/CLI-Anything/.venv/bin/activate
+CLI_TOOLS_BY_ROLE = {
+    "research": {
+        "cli-anything-ollama": "Local LLM queries. `cli-anything-ollama --json generate text --model qwen3.5:35b --prompt \"...\" --no-stream`",
+        "cli-anything-chromadb": "Search hub knowledge base. `cli-anything-chromadb --json query search --collection hub_knowledge --text \"...\" --n-results 5`",
+    },
+    "architect": {
+        "cli-anything-mermaid": "Diagram generation. `cli-anything-mermaid --json project new -o /tmp/arch.mermaid.json`, then `diagram set --text \"graph TD; ...\"`, then `export share --mode view`.",
+        "cli-anything-ollama": "Local LLM for brainstorming. `cli-anything-ollama --json generate text --model qwen3.5:35b --prompt \"...\" --no-stream`",
+        "cli-anything-chromadb": "Search existing docs/architecture. `cli-anything-chromadb --json query search --collection docs --text \"...\" --n-results 3`",
+    },
+    "developer": {
+        "cli-anything-ollama": "Local LLM for code questions. `cli-anything-ollama --json generate text --model qwen3.5:35b --prompt \"...\" --no-stream`",
+        "cli-anything-mermaid": "Generate diagrams. `cli-anything-mermaid --json project new -o /tmp/diagram.mermaid.json` then set/render.",
+        "cli-anything-seaclip": "Query kanban issues and pipeline status. `cli-anything-seaclip --json issue list --status backlog`",
+        "cli-anything-pm2": "Check running services. `cli-anything-pm2 --json process list`",
+    },
+    "tester": {
+        "cli-anything-pm2": "Check service status after tests. `cli-anything-pm2 --json process list`",
+    },
+    "reviewer": {
+        "cli-anything-chromadb": "Search for related context. `cli-anything-chromadb --json query search --collection codebase --text \"...\" --n-results 5`",
+    },
+    "release": {
+        "cli-anything-pm2": "Restart services after deploy. `cli-anything-pm2 --json lifecycle restart <service>`",
+        "cli-anything-seaclip": "Update issue status. `cli-anything-seaclip --json issue list`",
+    },
+}
+
 NEXT_AGENT = {
     "research": "Peter Plan (Architect)",
     "architect": "David Dev (Developer)",
@@ -59,7 +90,17 @@ class BaseAgent:
             f"8. Be thorough but concise. Use headings, bullet points, tables, and code blocks.\n"
         )
 
-        return header + self._instructions(issue) + output_format
+        # Inject available CLI tools for this agent role
+        cli_tools = CLI_TOOLS_BY_ROLE.get(self.role, {})
+        if cli_tools:
+            tools_section = "\n\n--- AVAILABLE CLI TOOLS ---\n"
+            tools_section += "You have access to these CLI tools (activate venv first: source /Users/whitenoise-oc/projects/CLI-Anything/.venv/bin/activate). Always use --json flag for parseable output.\n\n"
+            for tool_name, usage in cli_tools.items():
+                tools_section += f"**{tool_name}**: {usage}\n\n"
+        else:
+            tools_section = ""
+
+        return header + self._instructions(issue) + tools_section + output_format
 
     def _instructions(self, issue: Issue) -> str:
         """Override in subclasses to provide agent-specific instructions."""
@@ -107,11 +148,11 @@ class BaseAgent:
         await event_bus.publish("agents", "agent.active", {"agent": agent.name, "issue": issue.title})
 
         try:
-            # Run AI — respect ai_mode on the issue
+            # Run AI — resolve provider via model_config (soul → hub → env fallback)
             prompt = self.build_prompt(issue)
-            ai_mode = getattr(issue, "ai_mode", "claude") or "claude"
-            logger.info("Running %s for issue %s (ai_mode=%s)", self.name, issue.id[:8], ai_mode)
-            await event_bus.publish("agents", "agent.log", {"agent": agent.name, "message": f"Building prompt ({len(prompt)} chars) — ai_mode={ai_mode}"})
+            cfg = await resolve_model_config(db, agent_role=self.role)
+            logger.info("Running %s for issue %s (provider=%s model=%s)", self.name, issue.id[:8], cfg.provider, cfg.model or "default")
+            await event_bus.publish("agents", "agent.log", {"agent": agent.name, "message": f"Building prompt ({len(prompt)} chars) — provider={cfg.provider}"})
 
             # Live log callback — publishes events to SSE stream
             async def _on_log(line: str):
@@ -119,19 +160,15 @@ class BaseAgent:
                     "agent": agent.name, "message": line,
                 })
 
-            if ai_mode == "local":
-                output = await ai.ollama_generate(prompt, timeout=600)
-            elif ai_mode == "hybrid":
-                if self.role in ("developer", "tester", "release"):
-                    output = await ai.claude_chat(prompt, timeout=600, on_log=_on_log)
-                else:
-                    try:
-                        output = await ai.ollama_generate(prompt, timeout=600)
-                    except Exception:
-                        logger.warning("%s Ollama failed, falling back to Claude", self.name)
-                        output = await ai.claude_chat(prompt, timeout=600, on_log=_on_log)
-            else:
-                output = await ai.claude_chat(prompt, timeout=600, on_log=_on_log)
+            output = await ai.call_model(
+                provider=cfg.provider,
+                model=cfg.model,
+                api_key=cfg.api_key,
+                prompt=prompt,
+                base_url=cfg.base_url,
+                timeout=600,
+                on_log=_on_log,
+            )
 
             await event_bus.publish("agents", "agent.log", {"agent": agent.name, "message": f"AI returned {len(output)} chars"})
 

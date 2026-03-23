@@ -1,13 +1,14 @@
 """Agent status routes."""
 import json
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models import Agent
+from ..models import Agent, AgentSoul
 from ..services.events import event_bus
 
 router = APIRouter(prefix="/api/agents")
@@ -63,4 +64,49 @@ async def list_agents(request: Request, db: AsyncSession = Depends(get_db)):
     agents = (await db.execute(select(Agent).order_by(Agent.created_at))).scalars().all()
     return request.app.state.templates.TemplateResponse("partials/agent_list.html", {
         "request": request, "agents": agents,
+    })
+
+
+@router.get("/customize")
+async def customize_page(request: Request, db: AsyncSession = Depends(get_db)):
+    """Agent soul customization page."""
+    souls = (await db.execute(
+        select(AgentSoul).order_by(AgentSoul.agent_role)
+    )).scalars().all()
+    return request.app.state.templates.TemplateResponse("pages/agent_customize.html", {
+        "request": request,
+        "souls": souls,
+    })
+
+
+@router.post("/souls/{soul_id}")
+async def update_soul(
+    request: Request,
+    soul_id: int,
+    system_prompt: str = Form(""),
+    extra_instructions: str = Form(""),
+    temperature: str = Form("0.7"),
+    provider: str = Form(""),
+    model: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+):
+    soul = await db.get(AgentSoul, soul_id)
+    if not soul:
+        return HTMLResponse("Not found", status_code=404)
+
+    soul.system_prompt = system_prompt
+    soul.extra_instructions = extra_instructions
+    soul.temperature = temperature
+    soul.provider = provider
+    soul.model = model
+    soul.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    souls = (await db.execute(
+        select(AgentSoul).order_by(AgentSoul.agent_role)
+    )).scalars().all()
+    return request.app.state.templates.TemplateResponse("pages/agent_customize.html", {
+        "request": request,
+        "souls": souls,
+        "flash": f"Soul for '{soul.agent_role}' updated.",
     })
