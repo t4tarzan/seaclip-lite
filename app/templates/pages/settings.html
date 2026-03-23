@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% set active = "settings" %}
+{% block title %}Settings — SeaClip Lite{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-lg font-semibold">Hub Settings</h1>
+  <span class="text-[11px] text-text-muted">Configure your SeaClip Lite instance</span>
+</div>
+
+{% if flash %}
+<div class="bg-bg-alt border border-success/30 border-l-4 border-l-success p-3 mb-4">
+  <p class="text-[12px] text-success">{{ flash }}</p>
+</div>
+{% endif %}
+
+<form hx-post="/api/settings" hx-target="body" hx-swap="innerHTML" hx-select="#main-content" hx-push-url="/settings">
+  <div class="space-y-4">
+    <!-- GitHub -->
+    <div class="bg-bg-alt border border-border p-4">
+      <h2 class="text-[13px] font-semibold text-text-primary mb-3">GitHub</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">GitHub Organization</label>
+          <input type="text" name="github_org" value="{{ settings.get('github_org', '') }}"
+                 class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary placeholder-text-muted"
+                 placeholder="e.g. t4tarzan">
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Models -->
+    <div class="bg-bg-alt border border-border p-4">
+      <h2 class="text-[13px] font-semibold text-text-primary mb-3">AI Models</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">Claude Model</label>
+          <input type="text" name="claude_model" value="{{ settings.get('claude_model', '') }}"
+                 class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary placeholder-text-muted"
+                 placeholder="e.g. sonnet">
+        </div>
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">Ollama Model</label>
+          <input type="text" name="ollama_model" value="{{ settings.get('ollama_model', '') }}"
+                 class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary placeholder-text-muted"
+                 placeholder="e.g. qwen3.5:35b">
+        </div>
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">Ollama URL</label>
+          <input type="text" name="ollama_url" value="{{ settings.get('ollama_url', '') }}"
+                 class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary placeholder-text-muted"
+                 placeholder="http://localhost:11434">
+        </div>
+      </div>
+    </div>
+
+    <!-- Defaults -->
+    <div class="bg-bg-alt border border-border p-4">
+      <h2 class="text-[13px] font-semibold text-text-primary mb-3">Defaults</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">Default AI Mode</label>
+          <select name="default_ai_mode" class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary">
+            <option value="claude" {{ 'selected' if settings.get('default_ai_mode') == 'claude' else '' }}>Claude</option>
+            <option value="local" {{ 'selected' if settings.get('default_ai_mode') == 'local' else '' }}>Local (Ollama)</option>
+            <option value="hybrid" {{ 'selected' if settings.get('default_ai_mode') == 'hybrid' else '' }}>Hybrid</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">Default Pipeline Mode</label>
+          <select name="default_pipeline_mode" class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary">
+            <option value="manual" {{ 'selected' if settings.get('default_pipeline_mode') == 'manual' else '' }}>Manual</option>
+            <option value="auto" {{ 'selected' if settings.get('default_pipeline_mode') == 'auto' else '' }}>Auto</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- LLM Providers -->
+    <div class="bg-bg-alt border border-border p-4">
+      <h2 class="text-[13px] font-semibold text-text-primary mb-1">LLM Providers</h2>
+      <p class="text-[11px] text-text-muted mb-3">API keys are stored locally. Leave blank to keep the existing value.</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">Default Provider</label>
+          <select name="default_provider" class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary">
+            <option value="claude_cli" {{ 'selected' if settings.get('default_provider', 'claude_cli') == 'claude_cli' else '' }}>Claude CLI (local)</option>
+            <option value="anthropic" {{ 'selected' if settings.get('default_provider') == 'anthropic' else '' }}>Anthropic API</option>
+            <option value="openai" {{ 'selected' if settings.get('default_provider') == 'openai' else '' }}>OpenAI</option>
+            <option value="openrouter" {{ 'selected' if settings.get('default_provider') == 'openrouter' else '' }}>OpenRouter</option>
+            <option value="litellm" {{ 'selected' if settings.get('default_provider') == 'litellm' else '' }}>LiteLLM (proxy)</option>
+            <option value="ollama" {{ 'selected' if settings.get('default_provider') == 'ollama' else '' }}>Ollama (local)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">Default Model</label>
+          <input type="text" name="default_model" value="{{ settings.get('default_model', '') }}"
+                 class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary placeholder-text-muted"
+                 placeholder="e.g. gpt-4o, claude-3-5-sonnet-20241022">
+        </div>
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">Anthropic API Key</label>
+          <input type="password" name="anthropic_api_key"
+                 class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary placeholder-text-muted"
+                 placeholder="{{ '••••••••' if settings.get('anthropic_api_key') else 'sk-ant-... (leave blank to keep existing)' }}">
+        </div>
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">OpenAI API Key</label>
+          <input type="password" name="openai_api_key"
+                 class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary placeholder-text-muted"
+                 placeholder="{{ '••••••••' if settings.get('openai_api_key') else 'sk-... (leave blank to keep existing)' }}">
+        </div>
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">OpenRouter API Key</label>
+          <input type="password" name="openrouter_api_key"
+                 class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary placeholder-text-muted"
+                 placeholder="{{ '••••••••' if settings.get('openrouter_api_key') else 'sk-or-... (leave blank to keep existing)' }}">
+        </div>
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">LiteLLM Base URL</label>
+          <input type="text" name="litellm_base_url" value="{{ settings.get('litellm_base_url', '') }}"
+                 class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary placeholder-text-muted"
+                 placeholder="http://localhost:4000/v1">
+        </div>
+        <div>
+          <label class="text-[11px] text-text-muted font-semibold uppercase tracking-wider block mb-1">LiteLLM API Key (optional)</label>
+          <input type="password" name="litellm_api_key"
+                 class="w-full bg-bg border border-border text-text-primary text-[12px] px-3 py-1.5 focus:outline-none focus:border-primary placeholder-text-muted"
+                 placeholder="{{ '••••••••' if settings.get('litellm_api_key') else 'leave blank if not required' }}">
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-end">
+      <button type="submit"
+              class="bg-primary hover:bg-primary-hover text-white text-[12px] font-semibold px-5 py-2 transition-colors">
+        Save Settings
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

@@ -74,6 +74,7 @@ async def claude_chat(prompt: str, timeout: int = 600, on_log: LogCallback = Non
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=_env,
+        limit=10 * 1024 * 1024,  # 10MB readline limit (default 64KB too small for large tool outputs)
     )
 
     # Send prompt to stdin and close it
@@ -214,3 +215,80 @@ async def chat(system_prompt: str, messages: list[dict]) -> str:
     except Exception as e:
         logger.warning("Claude CLI failed (%s), falling back to Ollama", e)
         return await ollama_chat(system_prompt, messages)
+
+
+# ---------------------------------------------------------------------------
+# Multi-provider adapters
+# ---------------------------------------------------------------------------
+
+def _default_base_url(provider: str) -> str:
+    return {
+        "openai": "https://api.openai.com/v1",
+        "openrouter": "https://openrouter.ai/api/v1",
+    }.get(provider, "http://localhost:4000/v1")  # litellm default
+
+
+async def _openai_compat_call(
+    base_url: str,
+    api_key: str,
+    model: str,
+    prompt: str,
+    timeout: int = 300,
+) -> str:
+    """Shared caller for OpenAI, OpenRouter, and LiteLLM (same request shape)."""
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.post(
+            f"{base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        )
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"]
+
+
+async def _anthropic_call(api_key: str, model: str, prompt: str, timeout: int = 300) -> str:
+    """Anthropic Messages API direct call."""
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": model or "claude-3-5-sonnet-20241022",
+                "max_tokens": 4096,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        )
+        r.raise_for_status()
+        return r.json()["content"][0]["text"]
+
+
+async def call_model(
+    provider: str,
+    model: str,
+    api_key: str,
+    prompt: str,
+    base_url: str = "",
+    timeout: int = 600,
+    on_log: LogCallback = None,
+) -> str:
+    """Single entry point — dispatch to the correct adapter by provider."""
+    if provider == "claude_cli":
+        return await claude_chat(prompt, timeout=timeout, on_log=on_log)
+    if provider == "anthropic":
+        return await _anthropic_call(api_key, model or "claude-3-5-sonnet-20241022", prompt, timeout)
+    if provider in ("openai", "openrouter", "litellm"):
+        url = base_url or _default_base_url(provider)
+        return await _openai_compat_call(url, api_key, model, prompt, timeout)
+    if provider == "ollama":
+        return await ollama_generate(prompt, timeout=timeout)
+    raise ValueError(f"Unknown provider: {provider!r}")

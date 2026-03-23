@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -19,3 +20,11 @@ async def get_db():
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Migrate: add provider/model columns to agent_souls if they don't exist yet
+        for col, col_type in [("provider", "VARCHAR(50)"), ("model", "VARCHAR(100)")]:
+            try:
+                await conn.execute(
+                    text(f"ALTER TABLE agent_souls ADD COLUMN {col} {col_type} DEFAULT ''")
+                )
+            except Exception:
+                pass  # Column already exists
